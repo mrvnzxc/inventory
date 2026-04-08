@@ -1,0 +1,28 @@
+{
+  "name": "inventory",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "clean": "nuxi cleanup",
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "postgraphile": "postgraphile --connection \"$DATABASE_URL\" --schema public --enhance-graphiql --dynamic-json --cors"
+  },
+  "dependencies": {
+    "@nuxtjs/supabase": "^1.4.6",
+    "@nuxtjs/tailwindcss": "^6.14.0",
+    "@pinia/nuxt": "^0.11.3",
+    "nuxt": "^3.15.4",
+    "pinia": "^3.0.3",
+    "sweetalert2": "^11.26.24",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "postgraphile": "^4.14.1",
+    "typescript": "^5.7.3"
+  }
+}
