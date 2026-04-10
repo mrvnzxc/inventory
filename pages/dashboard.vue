@@ -12,7 +12,6 @@ const toast = useToast()
 const stats = ref<Awaited<ReturnType<typeof salesStore.computeDashboard>> | null>(null)
 const weeklySeries = ref<{ day: string; revenue: number }[]>([])
 const topProducts = ref<{ name: string; revenue: number }[]>([])
-const filteredSalesRows = ref<typeof salesStore.sales>([])
 const currentInventoryRows = ref<typeof inventoryStore.rows>([])
 const thresholdValue = Number(config.public.lowStockThreshold ?? 10)
 const lowStockModalOpen = ref(false)
@@ -26,18 +25,16 @@ async function loadDashboard() {
     await loadProfile()
     await loadBranches()
     await Promise.all([productStore.fetchProducts(), inventoryStore.fetchInventory(), salesStore.fetchSales(isOwner.value ? undefined : { branchOnly: true })])
-    const priceMap = new Map(productStore.products.map((p) => [p.id, p.price]))
     const threshold = thresholdValue
     let inv = inventoryStore.rows
     if (isOwner.value && ownerFocusBranchId.value) {
       inv = inv.filter((r) => r.branch_id === ownerFocusBranchId.value)
     }
     currentInventoryRows.value = inv
-    stats.value = await salesStore.computeDashboard(priceMap, inv, threshold)
+    stats.value = await salesStore.computeDashboard(inv, threshold)
     const filteredSales = salesStore.sales.filter((s) =>
       isOwner.value ? !ownerFocusBranchId.value || s.branch_id === ownerFocusBranchId.value : s.branch_id === branchId.value,
     )
-    filteredSalesRows.value = filteredSales
     const today = new Date()
     const keys: string[] = []
     for (let i = 6; i >= 0; i--) {
@@ -96,23 +93,10 @@ const pagedLowStockRows = computed(() => {
   return lowStockRows.value.slice(start, start + lowStockPageSize)
 })
 
-const transactionCount = computed(() => filteredSalesRows.value.length)
-const unitsSold = computed(() => filteredSalesRows.value.reduce((sum, s) => sum + s.quantity, 0))
-const avgTicket = computed(() => {
-  const tx = transactionCount.value
-  const revenue = stats.value?.weeklyTotal ?? 0
-  return tx > 0 ? revenue / tx : 0
-})
-const topProductSharePercent = computed(() => {
-  const total = topProducts.value.reduce((s, p) => s + p.revenue, 0)
-  if (total <= 0 || topProducts.value.length === 0) return 0
-  return Math.round((topProducts.value[0].revenue / total) * 100)
-})
-
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="min-w-0 space-y-6 sm:space-y-8">
     <div>
       <h1 class="text-2xl font-bold text-brand-950">📊 Dashboard</h1>
       <p class="text-sm text-brand-700">
@@ -123,59 +107,36 @@ const topProductSharePercent = computed(() => {
 
     <div v-if="loading" class="text-brand-700">Loading…</div>
 
-    <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <div class="rounded-xl border-0 border-l-4 border-l-yellow-500 bg-white p-5 shadow-sm">
+    <div v-else class="grid min-w-0 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div class="min-w-0 rounded-xl border-0 border-l-4 border-l-yellow-500 bg-white p-4 shadow-sm sm:p-5">
         <p class="text-sm font-medium text-yellow-700">Today revenue</p>
         <p class="mt-2 text-2xl font-bold text-yellow-800">{{ format(stats?.dailyTotal ?? 0) }}</p>
       </div>
-      <div class="rounded-xl border-0 border-l-4 border-l-amber-500 bg-white p-5 shadow-sm">
+      <div class="min-w-0 rounded-xl border-0 border-l-4 border-l-amber-500 bg-white p-4 shadow-sm sm:p-5">
         <p class="text-sm font-medium text-amber-700">Last 7 days revenue</p>
         <p class="mt-2 text-2xl font-bold text-amber-800">{{ format(stats?.weeklyTotal ?? 0) }}</p>
       </div>
-      <div class="rounded-xl border-0 border-l-4 border-l-lime-500 bg-white p-5 shadow-sm">
+      <div class="min-w-0 rounded-xl border-0 border-l-4 border-l-lime-500 bg-white p-4 shadow-sm sm:p-5">
         <p class="text-sm font-medium text-lime-700">Low stock</p>
         <button type="button" class="mt-2 text-2xl font-bold text-lime-800 hover:underline" @click="lowStockModalOpen = true">
           {{ lowStockRows.length }} SKUs
         </button>
         <button type="button" class="mt-3 rounded border border-brand-300 px-2 py-1 text-xs font-semibold text-brand-900 hover:bg-brand-50" @click="lowStockModalOpen = true">View items</button>
       </div>
-      <div class="rounded-xl border-0 border-l-4 border-l-sky-500 bg-white p-5 shadow-sm">
-        <p class="text-sm font-medium text-sky-700">Transactions (7d)</p>
-        <p class="mt-2 text-2xl font-bold text-sky-800">{{ transactionCount }}</p>
-      </div>
-      <div class="rounded-xl border-0 border-l-4 border-l-violet-500 bg-white p-5 shadow-sm">
-        <p class="text-sm font-medium text-violet-700">Units sold (7d)</p>
-        <p class="mt-2 text-2xl font-bold text-violet-800">{{ unitsSold }}</p>
-      </div>
-      <div class="rounded-xl border-0 border-l-4 border-l-rose-500 bg-white p-5 shadow-sm">
-        <p class="text-sm font-medium text-rose-700">Avg ticket (7d)</p>
-        <p class="mt-2 text-2xl font-bold text-rose-800">{{ format(avgTicket) }}</p>
-      </div>
     </div>
 
-    <div v-if="!loading" class="grid gap-4 md:grid-cols-2">
-      <div class="rounded-xl border-0 border-l-4 border-l-fuchsia-500 bg-white p-5 shadow-sm">
-        <p class="text-sm font-medium text-fuchsia-700">Top product share</p>
-        <p class="mt-2 text-2xl font-bold text-fuchsia-800">{{ topProductSharePercent }}%</p>
-        <div class="mt-3 h-2 rounded bg-brand-100">
-          <div class="h-2 rounded bg-fuchsia-500" :style="{ width: `${Math.max(4, topProductSharePercent)}%` }" />
-        </div>
-      </div>
-      <div class="rounded-xl border-0 border-l-4 border-l-orange-500 bg-white p-5 shadow-sm">
-        <p class="text-sm font-medium text-orange-700">Low-stock pressure</p>
-        <p class="mt-2 text-2xl font-bold text-orange-800">{{ lowStockRows.length }}</p>
-        <div class="mt-3 h-2 rounded bg-brand-100">
-          <div
-            class="h-2 rounded bg-orange-500"
-            :style="{ width: `${Math.min(100, lowStockRows.length * 8)}%` }"
-          />
-        </div>
-      </div>
-    </div>
+    <DashboardCharts
+      v-if="!loading"
+      :is-owner="isOwner"
+      :weekly-series="weeklySeries"
+      :top-products="topProducts"
+      :by-branch="stats?.byBranch ?? []"
+      :format-money="format"
+    />
 
-    <div class="grid gap-6 lg:grid-cols-2">
-      <div class="rounded-xl border-0 bg-white shadow-sm">
-        <div class="border-b border-brand-100 px-4 py-3">
+    <div class="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2">
+      <div class="min-w-0 rounded-xl border-0 bg-white shadow-sm">
+        <div class="border-b border-brand-100 px-3 py-3 sm:px-4">
           <h2 class="font-semibold text-brand-950">
             {{ isOwner ? 'Sales per branch (7 days)' : 'Sales trend (7 days)' }}
           </h2>
@@ -183,8 +144,8 @@ const topProductSharePercent = computed(() => {
             {{ isOwner ? 'Quantity and revenue from recorded prices' : 'Branch revenue day-by-day' }}
           </p>
         </div>
-        <div v-if="isOwner" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-brand-100 text-sm">
+        <div v-if="isOwner" class="min-w-0 overflow-x-auto">
+          <table class="w-full min-w-[280px] divide-y divide-brand-100 text-sm">
             <thead class="bg-white">
               <tr>
                 <th class="px-4 py-2 text-left font-medium text-brand-800">Branch</th>
@@ -204,7 +165,7 @@ const topProductSharePercent = computed(() => {
             </tbody>
           </table>
         </div>
-        <div v-else class="space-y-2 p-4">
+        <div v-else class="min-w-0 space-y-2 p-3 sm:p-4">
           <div
             v-for="d in weeklySeries"
             :key="d.day"
@@ -224,13 +185,13 @@ const topProductSharePercent = computed(() => {
         </div>
       </div>
 
-      <div class="rounded-xl border-0 bg-white shadow-sm">
-        <div class="border-b border-brand-100 px-4 py-3">
+      <div class="min-w-0 rounded-xl border-0 bg-white shadow-sm">
+        <div class="border-b border-brand-100 px-3 py-3 sm:px-4">
           <h2 class="font-semibold text-brand-950">{{ isOwner ? 'Low stock alerts' : 'Top products (revenue)' }}</h2>
           <p class="text-xs text-brand-600">{{ isOwner ? 'Across both branches' : 'Current branch mix' }}</p>
         </div>
-        <div v-if="isOwner" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-brand-100 text-sm">
+        <div v-if="isOwner" class="min-w-0 overflow-x-auto">
+          <table class="w-full min-w-[280px] divide-y divide-brand-100 text-sm">
             <thead class="bg-white">
               <tr>
                 <th class="px-4 py-2 text-left font-medium text-brand-800">Product</th>
@@ -250,7 +211,7 @@ const topProductSharePercent = computed(() => {
             </tbody>
           </table>
         </div>
-        <div v-else class="space-y-2 p-4">
+        <div v-else class="min-w-0 space-y-2 p-3 sm:p-4">
           <div v-for="p in topProducts" :key="p.name" class="space-y-1">
             <div class="flex items-center justify-between text-xs text-brand-700">
               <span class="truncate">{{ p.name }}</span>

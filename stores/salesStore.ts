@@ -31,9 +31,11 @@ export const useSalesStore = defineStore('sales', () => {
         .select(
           `
           id,
+          transaction_code,
           product_id,
           branch_id,
           quantity,
+          unit_price,
           sold_by,
           created_at,
           products (name, price),
@@ -59,9 +61,12 @@ export const useSalesStore = defineStore('sales', () => {
     const supabase = useSupabaseClient()
     const user = useSupabaseUser()
     if (!user.value) throw new Error('Not signed in')
+    const { data: txCode, error: txErr } = await supabase.rpc('next_sales_transaction_code')
+    if (txErr) throw new Error(postgrestErrorMessage(txErr))
     const { data, error } = await supabase
       .from('sales')
       .insert({
+        transaction_code: txCode,
         product_id: payload.product_id,
         branch_id: payload.branch_id,
         quantity: payload.quantity,
@@ -82,7 +87,10 @@ export const useSalesStore = defineStore('sales', () => {
     if (!user.value) throw new Error('Not signed in')
     const rows = payloads.filter((p) => p.quantity > 0)
     if (rows.length === 0) return { count: 0 }
+    const { data: txCode, error: txErr } = await supabase.rpc('next_sales_transaction_code')
+    if (txErr) throw new Error(postgrestErrorMessage(txErr))
     const insertRows = rows.map((p) => ({
+      transaction_code: txCode,
       product_id: p.product_id,
       branch_id: p.branch_id,
       quantity: p.quantity,
@@ -93,11 +101,7 @@ export const useSalesStore = defineStore('sales', () => {
     return { count: rows.length }
   }
 
-  async function computeDashboard(
-    productPriceMap: Map<string, number | null>,
-    inventoryRows: InventoryRow[],
-    threshold: number,
-  ): Promise<DashboardStats> {
+  async function computeDashboard(inventoryRows: InventoryRow[], threshold: number): Promise<DashboardStats> {
     const supabase = useSupabaseClient()
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
@@ -105,20 +109,24 @@ export const useSalesStore = defineStore('sales', () => {
 
     const { data: daySales, error: e1 } = await supabase
       .from('sales')
-      .select('product_id, quantity')
+      .select('product_id, quantity, unit_price, products(price)')
       .gte('created_at', startOfDay)
     if (e1) throw e1
 
     const { data: weekSales, error: e2 } = await supabase
       .from('sales')
-      .select('product_id, quantity, branch_id, branches(name)')
+      .select('product_id, quantity, unit_price, branch_id, branches(name), products(price)')
       .gte('created_at', weekAgo)
     if (e2) throw e2
 
-    const sumRevenue = (rows: { product_id: string; quantity: number }[]) =>
+    const sumRevenue = (rows: { product_id: string; quantity: number; unit_price?: number | null; products?: { price?: number | null } | null }[]) =>
       rows.reduce((acc, r) => {
-        const p = productPriceMap.get(r.product_id)
-        const unit = typeof p === 'number' ? p : 0
+        const unit =
+          typeof r.unit_price === 'number'
+            ? r.unit_price
+            : typeof r.products?.price === 'number'
+              ? r.products.price
+              : 0
         return acc + unit * r.quantity
       }, 0)
 
@@ -130,8 +138,13 @@ export const useSalesStore = defineStore('sales', () => {
       const name = b.branches?.name ?? 'Branch'
       const cur = branchMap.get(b.branch_id) ?? { branch_name: name, total_qty: 0, revenue: 0 }
       cur.total_qty += b.quantity
-      const price = productPriceMap.get(b.product_id)
-      cur.revenue += (typeof price === 'number' ? price : 0) * b.quantity
+      const unit =
+        typeof (b as { unit_price?: number | null }).unit_price === 'number'
+          ? Number((b as { unit_price?: number | null }).unit_price)
+          : typeof (b as { products?: { price?: number | null } }).products?.price === 'number'
+            ? Number((b as { products?: { price?: number | null } }).products?.price)
+            : 0
+      cur.revenue += unit * b.quantity
       branchMap.set(b.branch_id, cur)
     }
 

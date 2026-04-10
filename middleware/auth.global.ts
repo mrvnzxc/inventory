@@ -32,6 +32,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   if (to.path === '/login') {
+    if (userRef.value && isAuthSessionExpired()) {
+      await useAuth().signOut()
+      return
+    }
     if (userRef.value) {
       return navigateTo('/dashboard')
     }
@@ -40,5 +44,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   if (!userRef.value) {
     return navigateTo('/login')
+  }
+
+  if (isAuthSessionExpired()) {
+    await useAuth().signOut()
+    return
   }
 })

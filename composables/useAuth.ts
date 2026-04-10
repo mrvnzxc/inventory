@@ -1,3 +1,5 @@
+import { markAuthSessionStart } from '~/utils/authSession'
+
 export function useAuth() {
   const authStore = useAuthStore()
   const user = useSupabaseUser()
@@ -6,6 +8,7 @@ export function useAuth() {
   async function signIn(email: string, password: string) {
     const { error } = await client.auth.signInWithPassword({ email, password })
     if (error) throw error
+    markAuthSessionStart()
     await authStore.loadProfile()
     await authStore.loadBranches()
   }

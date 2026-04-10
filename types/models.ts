@@ -51,9 +51,11 @@ export interface InventoryRow {
 
 export interface Sale {
   id: string
+  transaction_code?: string | null
   product_id: string
   branch_id: string
   quantity: number
+  unit_price?: number | null
   sold_by: string
   created_at: string
   products?: { name: string; price: number | null } | null

@@ -1,4 +1,5 @@
 import type { Branch, Profile } from '~/types/models'
+import { clearAuthSessionClock } from '~/utils/authSession'
 
 const OWNER_NAV_BRANCH_KEY = 'ownerNavBranchId'
 
@@ -92,6 +93,7 @@ export const useAuthStore = defineStore('auth', () => {
     ownerFocusBranchId.value = null
     if (import.meta.client) {
       localStorage.removeItem(OWNER_NAV_BRANCH_KEY)
+      clearAuthSessionClock()
     }
   }
 

@@ -63,7 +63,7 @@ const breadcrumbs = computed(() => {
     >
       <AppSidebar :collapsed="sidebarCollapsed" @close="mobileNavOpen = false" />
     </div>
-    <div class="flex min-w-0 flex-1 flex-col">
+    <div class="flex min-w-0 flex-1 flex-col overflow-x-hidden">
       <header class="bg-white">
         <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div class="flex min-w-0 items-center gap-2">
@@ -113,8 +113,8 @@ const breadcrumbs = computed(() => {
           </NuxtLink>
         </nav>
       </header>
-      <main class="flex-1 overflow-auto bg-white p-4 md:p-8">
-        <div class="mx-auto w-full max-w-7xl">
+      <main class="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-white p-3 sm:p-4 md:p-8">
+        <div class="mx-auto w-full min-w-0 max-w-7xl">
           <slot />
         </div>
       </main>
