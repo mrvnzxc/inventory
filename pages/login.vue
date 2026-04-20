@@ -130,13 +130,13 @@ async function onSubmit() {
         class="w-full max-w-[420px] rounded-3xl border border-yellow-100/80 bg-white/85 p-8 shadow-[0_24px_80px_-12px_rgba(180,83,9,0.12)] backdrop-blur-xl sm:p-10"
       >
         <div class="mb-8 text-center">
-          <p
-            class="inline-flex items-center gap-2 rounded-full bg-[#FEF9C3] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-yellow-900"
+          <h1
+            class="mx-auto max-w-[22rem] text-base font-semibold leading-snug text-neutral-900 text-balance sm:max-w-none sm:text-lg"
           >
-            <span class="h-1.5 w-1.5 rounded-full bg-yellow-500" />
-            Beauty inventory
-          </p>
-          <h1 class="mt-4 text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl">Welcome back</h1>
+            <span class="bg-gradient-to-r from-[#EAB308] to-[#FACC15] bg-clip-text font-bold text-transparent">ReedGrey</span>
+            Housecare and Personal Care Products Trading
+          </h1>
+          <p class="mt-6 text-2xl font-bold tracking-tight text-neutral-900 sm:mt-7 sm:text-3xl">Welcome back</p>
           <p class="mt-2 text-sm text-neutral-600">Sign in to manage sales, stock, and branches.</p>
         </div>
 
