@@ -5,16 +5,18 @@ const supabase = useSupabaseClient()
 const toast = useToast()
 
 const form = reactive({
+  oldPassword: '',
   newPassword: '',
   confirmPassword: '',
 })
 const busy = ref(false)
 
 async function changePassword() {
+  const oldPassword = form.oldPassword.trim()
   const next = form.newPassword.trim()
   const confirm = form.confirmPassword.trim()
-  if (!next || !confirm) {
-    toast.push('Enter and confirm your new password', 'error')
+  if (!oldPassword || !next || !confirm) {
+    toast.push('Enter old password and your new password details', 'error')
     return
   }
   if (next.length < 6) {
@@ -27,8 +29,23 @@ async function changePassword() {
   }
   busy.value = true
   try {
+    const { data: userData, error: userErr } = await supabase.auth.getUser()
+    if (userErr) throw userErr
+    const email = userData.user?.email
+    if (!email) throw new Error('Unable to verify account email')
+
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email,
+      password: oldPassword,
+    })
+    if (verifyError) {
+      toast.push('Old password is incorrect', 'error')
+      return
+    }
+
     const { error } = await supabase.auth.updateUser({ password: next })
     if (error) throw error
+    form.oldPassword = ''
     form.newPassword = ''
     form.confirmPassword = ''
     toast.push('Password changed successfully', 'success')
@@ -52,6 +69,16 @@ async function changePassword() {
     <div class="rounded-xl border border-brand-200 bg-white p-5 shadow-sm">
       <form class="space-y-4" @submit.prevent="changePassword">
         <div>
+          <label class="text-xs text-brand-700">Old password</label>
+          <input
+            v-model="form.oldPassword"
+            type="password"
+            autocomplete="current-password"
+            class="mt-1 w-full rounded-lg border border-brand-300 px-3 py-2 text-sm"
+            placeholder="Enter current password"
+          />
+        </div>
+        <div>
           <label class="text-xs text-brand-700">New password</label>
           <input
             v-model="form.newPassword"
@@ -73,10 +100,10 @@ async function changePassword() {
         </div>
         <button
           type="submit"
-          class="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-brand-950 hover:bg-brand-400 disabled:opacity-60"
+          class="rounded-lg bg-yellow-400 px-4 py-2 text-sm font-semibold text-black hover:bg-yellow-300 disabled:opacity-60"
           :disabled="busy"
         >
-          {{ busy ? 'Updating…' : 'Update password' }}
+          {{ busy ? 'Updating…' : 'Update' }}
         </button>
       </form>
     </div>

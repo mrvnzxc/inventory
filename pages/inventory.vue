@@ -6,9 +6,13 @@ definePageMeta({ layout: 'default' })
 const { isOwner, branchId, ownerFocusBranchId, loadProfile, loadBranches } = useAuth()
 const toast = useToast()
 const { rows, loading, fetchInventory, adjustStock } = useInventory()
+const config = useRuntimeConfig()
 const page = ref(1)
 const pageSize = ref(10)
 const searchTerm = ref('')
+const categoryFilter = ref('all')
+const subcategoryFilter = ref('all')
+const lowStockThreshold = Number(config.public.lowStockThreshold ?? 10)
 
 const editingId = ref<string | null>(null)
 const editingStock = ref('')
@@ -34,11 +38,51 @@ const visibleRows = computed(() => {
   return list.filter((r) => r.branch_id === ownerFocusBranchId.value)
 })
 
+const categoryOptions = computed(() => {
+  const map = new Map<string, { id: string; name: string; lowStockCount: number }>()
+  for (const r of visibleRows.value) {
+    const categoryId = r.products?.category_id
+    if (!categoryId) continue
+    const name = r.products?.categories?.name ?? 'Uncategorized'
+    const existing = map.get(categoryId) ?? { id: categoryId, name, lowStockCount: 0 }
+    if (r.stock <= lowStockThreshold) existing.lowStockCount += 1
+    map.set(categoryId, existing)
+  }
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+})
+
+const subcategoryOptions = computed(() => {
+  const map = new Map<string, { id: string; name: string; lowStockCount: number }>()
+  for (const r of visibleRows.value) {
+    if (categoryFilter.value !== 'all' && r.products?.category_id !== categoryFilter.value) continue
+    const subcategoryId = r.products?.subcategory_id
+    if (!subcategoryId) continue
+    const name = r.products?.subcategories?.name ?? 'Uncategorized'
+    const existing = map.get(subcategoryId) ?? { id: subcategoryId, name, lowStockCount: 0 }
+    if (r.stock <= lowStockThreshold) existing.lowStockCount += 1
+    map.set(subcategoryId, existing)
+  }
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+})
+
 const filteredRows = computed(() => {
   const q = searchTerm.value.trim().toLowerCase()
-  if (!q) return visibleRows.value
-  return visibleRows.value.filter((r) =>
-    [r.products?.name ?? '', r.branches?.name ?? ''].join(' ').toLowerCase().includes(q),
+  const categoryFiltered = visibleRows.value.filter((r) => {
+    if (categoryFilter.value !== 'all' && r.products?.category_id !== categoryFilter.value) return false
+    if (subcategoryFilter.value !== 'all' && r.products?.subcategory_id !== subcategoryFilter.value) return false
+    return true
+  })
+  if (!q) return categoryFiltered
+  return categoryFiltered.filter((r) =>
+    [
+      r.products?.name ?? '',
+      r.products?.categories?.name ?? '',
+      r.products?.subcategories?.name ?? '',
+      r.branches?.name ?? '',
+    ]
+      .join(' ')
+      .toLowerCase()
+      .includes(q),
   )
 })
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredRows.value.length / pageSize.value)))
@@ -52,6 +96,13 @@ const showingTo = computed(() => Math.min(page.value * pageSize.value, filteredR
 watch([visibleRows, searchTerm, pageSize], () => {
   if (page.value < 1) page.value = 1
   if (page.value > totalPages.value) page.value = totalPages.value
+})
+watch(categoryFilter, () => {
+  subcategoryFilter.value = 'all'
+  page.value = 1
+})
+watch(subcategoryFilter, () => {
+  page.value = 1
 })
 
 function startEdit(r: { id: string; stock: number }) {
@@ -101,11 +152,44 @@ async function saveEdit() {
           <input v-model="searchTerm" type="text" placeholder="Search product or branch..." class="mt-1 w-full md:w-80 rounded-lg border border-brand-300 px-3 py-2 text-sm" />
         </div>
       </div>
+      <div class="border-b border-brand-100 px-4 py-3">
+        <div class="flex flex-col gap-3 md:flex-row md:items-end md:gap-0">
+          <div class="w-full md:w-auto">
+            <label class="text-xs text-brand-700">Category</label>
+            <select v-model="categoryFilter" class="mt-1 w-full md:w-64 rounded-lg border border-brand-300 px-3 py-2 text-sm">
+              <option value="all">All categories</option>
+              <option
+                v-for="c in categoryOptions"
+                :key="c.id"
+                :value="c.id"
+              >
+                {{ c.lowStockCount > 0 ? `${c.name} ● ${c.lowStockCount}` : c.name }}
+              </option>
+            </select>
+          </div>
+          <div class="w-full md:w-auto">
+            <label class="text-xs text-brand-700">Subcategory</label>
+            <select v-model="subcategoryFilter" class="mt-1 w-full md:w-64 rounded-lg border border-brand-300 px-3 py-2 text-sm">
+              <option value="all">All subcategories</option>
+              <option
+                v-for="s in subcategoryOptions"
+                :key="s.id"
+                :value="s.id"
+              >
+                {{ s.lowStockCount > 0 ? `${s.name} ● ${s.lowStockCount}` : s.name }}
+              </option>
+            </select>
+            <p v-if="subcategoryOptions.length === 0" class="mt-1 text-xs text-brand-600">No subcategories in this category</p>
+          </div>
+        </div>
+      </div>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-brand-100 text-sm">
           <thead class="bg-white">
             <tr>
               <th class="px-4 py-2 text-left font-medium text-brand-800">Product</th>
+              <th class="px-4 py-2 text-left font-medium text-brand-800">Category</th>
+              <th class="px-4 py-2 text-left font-medium text-brand-800">Subcategory</th>
               <th class="px-4 py-2 text-left font-medium text-brand-800">Branch</th>
               <th class="px-4 py-2 text-right font-medium text-brand-800">Stock</th>
               <th class="px-4 py-2 text-right font-medium text-brand-800">Adjust</th>
@@ -116,6 +200,8 @@ async function saveEdit() {
               <td class="px-4 py-2 font-medium text-brand-950">
                 {{ r.products?.name ?? '—' }}
               </td>
+              <td class="px-4 py-2 text-brand-800">{{ r.products?.categories?.name ?? '—' }}</td>
+              <td class="px-4 py-2 text-brand-800">{{ r.products?.subcategories?.name ?? '—' }}</td>
               <td class="px-4 py-2 text-brand-800">{{ r.branches?.name ?? '—' }}</td>
               <td class="px-4 py-2 text-right tabular-nums text-brand-900">
                 <span v-if="editingId !== r.id">{{ r.stock }}</span>
@@ -145,7 +231,7 @@ async function saveEdit() {
               </td>
             </tr>
             <tr v-if="!loading && filteredRows.length === 0">
-              <td colspan="4" class="px-4 py-8 text-center text-brand-600">
+              <td colspan="6" class="px-4 py-8 text-center text-brand-600">
                 No inventory rows yet — add products as owner to seed stock rows.
               </td>
             </tr>

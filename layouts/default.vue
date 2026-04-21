@@ -12,7 +12,10 @@ const links = computed(() => {
     { to: '/sales', label: 'POS' },
     { to: '/sales/history', label: 'Sales history' },
   ]
-  if (isOwner.value) base.push({ to: '/team', label: 'Team' })
+  if (isOwner.value) {
+    base.push({ to: '/team', label: 'Team' })
+    base.push({ to: '/settings', label: 'Settings' })
+  }
   base.push({ to: '/account/password', label: 'Change password' })
   return base
 })
@@ -29,6 +32,7 @@ const breadcrumbLabelMap: Record<string, string> = {
   sales: 'POS',
   history: 'Sales history',
   team: 'Team',
+  settings: 'Settings',
   account: 'Account',
   password: 'Change password',
 }

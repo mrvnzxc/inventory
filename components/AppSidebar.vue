@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
+
 const route = useRoute()
 const { isOwner, branches, ownerFocusBranchId, setOwnerFocusBranch, loadBranches, signOut, profile } = useAuth()
 const toast = useToast()
@@ -10,16 +12,17 @@ const signingOut = ref(false)
 
 const links = computed(() => {
   const base = [
-    { to: '/dashboard', label: 'Dashboard' },
-    { to: '/products', label: 'Products' },
-    { to: '/inventory', label: 'Inventory' },
-    { to: '/sales', label: 'POS' },
-    { to: '/sales/history', label: 'Sales history' },
+    { to: '/dashboard', label: 'Dashboard', icon: 'mdi:view-dashboard-outline' },
+    { to: '/products', label: 'Products', icon: 'mdi:package-variant-closed' },
+    { to: '/inventory', label: 'Inventory', icon: 'mdi:warehouse' },
+    { to: '/sales', label: 'POS', icon: 'mdi:cash-register' },
+    { to: '/sales/history', label: 'Sales history', icon: 'mdi:chart-timeline-variant' },
   ]
   if (isOwner.value) {
-    base.push({ to: '/team', label: 'Team' })
+    base.push({ to: '/team', label: 'Team', icon: 'mdi:account-group-outline' })
+    base.push({ to: '/settings', label: 'Settings', icon: 'mdi:cog-outline' })
   }
-  base.push({ to: '/account/password', label: 'Change password' })
+  base.push({ to: '/account/password', label: 'Change password', icon: 'mdi:lock-reset' })
   return base
 })
 
@@ -66,11 +69,14 @@ async function doSignOut() {
   >
     <div class="border-b border-brand-200 px-5 py-6">
       <div class="flex items-center justify-between gap-2">
-        <div v-if="!props.collapsed">
-          <p class="text-xs font-semibold uppercase tracking-wide text-neutral-700">Inventory</p>
-          <p class="text-lg font-bold text-black">Branch POS</p>
+        <div v-if="!props.collapsed" class="w-full text-center">
+          <p class="text-lg font-bold leading-tight">
+            <span class="text-[#a16207]">ReedGrey</span>
+          </p>
         </div>
-        <div v-else class="mx-auto rounded-lg bg-[#FACC15] px-2 py-1 text-xs font-bold text-black">POS</div>
+        <div v-else class="mx-auto rounded-lg bg-[#FACC15] px-2 py-1 text-xs font-bold text-black">
+          <Icon icon="mdi:store-outline" class="h-5 w-5" />
+        </div>
         <button
           type="button"
           class="rounded-md border border-brand-300 bg-white px-2 py-1 text-xs font-semibold text-brand-900 md:hidden"
@@ -88,7 +94,7 @@ async function doSignOut() {
           v-for="b in branches"
           :key="b.id"
           type="button"
-          class="rounded-lg px-3 py-2.5 text-left text-sm font-medium transition"
+          class="flex items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition"
           :class="
             ownerFocusBranchId === b.id
               ? 'bg-[#FACC15] text-black shadow-sm'
@@ -96,7 +102,8 @@ async function doSignOut() {
           "
           @click="setOwnerFocusBranch(b.id)"
         >
-          {{ b.name }}
+          <Icon icon="mdi:store-marker-outline" class="h-4 w-4 shrink-0" />
+          <span class="truncate">{{ b.name }}</span>
         </button>
       </div>
     </div>
@@ -107,14 +114,16 @@ async function doSignOut() {
         :key="l.to"
         :to="l.to"
         class="rounded-lg py-2.5 text-sm font-semibold transition"
+        :title="props.collapsed ? l.label : ''"
         :class="[
-          props.collapsed ? 'px-2 text-left text-[11px] leading-tight' : 'px-3',
+          props.collapsed ? 'flex items-center justify-center px-2' : 'flex items-center gap-2 px-3',
           isActive(l.to)
             ? 'bg-[#FACC15] text-black shadow-sm'
             : 'text-neutral-900 hover:bg-[#FEF08A]',
         ]"
       >
-        <span class="block break-words">{{ l.label }}</span>
+        <Icon :icon="l.icon" class="h-5 w-5 shrink-0" />
+        <span v-if="!props.collapsed" class="block truncate">{{ l.label }}</span>
       </NuxtLink>
     </nav>
     <div class="border-t border-brand-200 p-3">

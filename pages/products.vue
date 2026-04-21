@@ -10,12 +10,10 @@ const {
   products,
   categories,
   subcategories,
-  managerSubcategories,
   loading,
   fetchProducts,
   fetchCategories,
   fetchSubcategories,
-  fetchManagerSubcategories,
   createCategory,
   createSubcategory,
   createProduct,
@@ -26,8 +24,6 @@ const {
 const newCategory = ref('')
 const subCatCategoryId = ref('')
 const newSubcategory = ref('')
-/** Browse-only selection in the manager panel (mirrors New product subcategory dropdown UX) */
-const managerSelectedSubId = ref('')
 
 const form = reactive({
   category_id: '',
@@ -97,11 +93,6 @@ watch(
   },
 )
 
-watch(subCatCategoryId, (id) => {
-  managerSelectedSubId.value = ''
-  fetchManagerSubcategories(id || null)
-})
-
 async function addCategory() {
   const name = newCategory.value.trim()
   if (!name) {
@@ -129,12 +120,17 @@ async function addSubcategory() {
   }
   try {
     await createSubcategory(subCatCategoryId.value, name)
+    await fetchSubcategories(subCatCategoryId.value)
+    const created = [...subcategories.value]
+      .reverse()
+      .find((s) => s.category_id === subCatCategoryId.value && s.name.trim().toLowerCase() === name.toLowerCase())
+
+    // Move user directly to New product with the new parent/subcategory preselected.
+    form.category_id = subCatCategoryId.value
+    form.subcategory_id = created?.id ?? ''
     newSubcategory.value = ''
-    managerSelectedSubId.value = ''
-    if (form.category_id === subCatCategoryId.value) {
-      await fetchSubcategories(form.category_id)
-    }
-    toast.push('Subcategory added', 'success')
+    modalView.value = 'product'
+    toast.push('Subcategory added. You can now create a product under it.', 'success')
   } catch (e: unknown) {
     toast.push(e instanceof Error ? e.message : 'Failed', 'error')
   }
@@ -381,6 +377,11 @@ function formatPeso(value: number | null) {
 }
 
 function openModal(view: 'product' | 'taxonomy') {
+  if (view === 'taxonomy') {
+    // Reuse currently selected category context so users can add subcategories faster.
+    if (form.category_id) subCatCategoryId.value = form.category_id
+    else if (catalogCategoryFilter.value !== 'all') subCatCategoryId.value = catalogCategoryFilter.value
+  }
   modalView.value = view
   modalOpen.value = true
 }
@@ -447,14 +448,14 @@ onBeforeUnmount(() => {
     <div v-if="isOwner" class="flex flex-wrap gap-2">
       <button
         type="button"
-        class="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-brand-950 hover:bg-brand-400"
+        class="rounded-lg bg-yellow-400 px-4 py-2 text-sm font-semibold text-black shadow-sm ring-1 ring-yellow-500 transition hover:bg-yellow-300 hover:shadow"
         @click="openModal('product')"
       >
-        New product
+        ➕ New product
       </button>
       <button
         type="button"
-        class="rounded-lg border border-brand-300 bg-white px-4 py-2 text-sm font-semibold text-brand-900 hover:bg-brand-50"
+        class="rounded-lg border border-yellow-500 bg-yellow-100 px-4 py-2 text-sm font-semibold text-black shadow-sm transition hover:bg-yellow-200 hover:shadow"
         @click="openModal('taxonomy')"
       >
         Categories & subcategories
@@ -625,7 +626,7 @@ onBeforeUnmount(() => {
             </div>
             <button
               type="submit"
-              class="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-brand-950 hover:bg-brand-400 disabled:opacity-60"
+              class="rounded-lg bg-yellow-400 px-4 py-2 text-sm font-semibold text-black shadow-sm ring-1 ring-yellow-500 transition hover:bg-yellow-300 hover:shadow disabled:opacity-60"
               :disabled="savingProduct"
             >
               {{ savingProduct ? 'Saving…' : 'Save product' }}
@@ -651,7 +652,7 @@ onBeforeUnmount(() => {
               />
               <button
                 type="button"
-                class="rounded-lg bg-brand-500 px-3 py-2 text-sm font-semibold text-brand-950 hover:bg-brand-400"
+                class="rounded-lg bg-yellow-400 px-3 py-2 text-sm font-semibold text-black shadow-sm ring-1 ring-yellow-500 transition hover:bg-yellow-300 hover:shadow"
                 @click="addCategory"
               >
                 Add category
@@ -669,21 +670,6 @@ onBeforeUnmount(() => {
             </select>
           </div>
           <div>
-            <label class="text-xs text-brand-700">Existing subcategories</label>
-            <select
-              v-if="subCatCategoryId && managerSubcategories.length > 0"
-              v-model="managerSelectedSubId"
-              class="mt-1 w-full rounded-lg border border-brand-300 px-3 py-2 text-sm text-brand-900"
-            >
-              <option value="">Browse (optional)</option>
-              <option v-for="s in managerSubcategories" :key="s.id" :value="s.id">{{ s.name }}</option>
-            </select>
-            <p v-else class="mt-1 rounded-lg border border-dashed border-brand-200 bg-white px-3 py-2 text-xs text-brand-600">
-              <span v-if="!subCatCategoryId">Choose a parent category to list subcategories here.</span>
-              <span v-else>No subcategories yet — add one below.</span>
-            </p>
-          </div>
-          <div>
             <label class="text-xs text-brand-700">New subcategory name</label>
             <div class="mt-1 flex flex-wrap gap-2">
               <input
@@ -693,7 +679,7 @@ onBeforeUnmount(() => {
               />
               <button
                 type="button"
-                class="rounded-lg border border-brand-300 bg-white px-3 py-2 text-sm font-semibold text-brand-900 hover:bg-brand-50"
+                class="rounded-lg border border-yellow-500 bg-yellow-100 px-3 py-2 text-sm font-semibold text-black shadow-sm transition hover:bg-yellow-200 hover:shadow"
                 @click="addSubcategory"
               >
                 Add subcategory

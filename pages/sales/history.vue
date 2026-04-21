@@ -11,13 +11,18 @@ const selectedTx = ref<{
   txCode: string
   created_at: string
   branch_name: string
-  products: string[]
+  items: {
+    name: string
+    qty: number
+    unitPrice: number
+    lineTotal: number
+  }[]
   total_qty: number
   total_amount: number
 } | null>(null)
 
-function productsPreview(products: string[]) {
-  const joined = products.join(', ')
+function productsPreview(items: { name: string; qty: number }[]) {
+  const joined = items.map((item) => `${item.name} x${item.qty}`).join(', ')
   const max = 70
   if (joined.length <= max) return joined
   return `${joined.slice(0, max)}...`
@@ -36,7 +41,12 @@ const groupedSales = computed(() => {
       txCode: string
       created_at: string
       branch_name: string
-      products: string[]
+      items: {
+        name: string
+        qty: number
+        unitPrice: number
+        lineTotal: number
+      }[]
       total_qty: number
       total_amount: number
     }
@@ -51,10 +61,15 @@ const groupedSales = computed(() => {
           ? s.products.price
           : 0
     const lineTotal = lineUnit * s.quantity
-    const productLabel = `${s.products?.name ?? 'Unknown'} x${s.quantity}`
+    const item = {
+      name: s.products?.name ?? 'Unknown',
+      qty: s.quantity,
+      unitPrice: lineUnit,
+      lineTotal,
+    }
     const existing = map.get(txCode)
     if (existing) {
-      existing.products.push(productLabel)
+      existing.items.push(item)
       existing.total_qty += s.quantity
       existing.total_amount += lineTotal
       continue
@@ -63,7 +78,7 @@ const groupedSales = computed(() => {
       txCode,
       created_at: s.created_at,
       branch_name: s.branches?.name ?? '—',
-      products: [productLabel],
+      items: [item],
       total_qty: s.quantity,
       total_amount: lineTotal,
     })
@@ -76,7 +91,15 @@ const filteredSales = computed(() => {
   const q = searchTerm.value.trim().toLowerCase()
   if (!q) return groupedSales.value
   return groupedSales.value.filter((s) =>
-    [s.txCode, s.products.join(' '), s.branch_name, new Date(s.created_at).toLocaleString()].join(' ').toLowerCase().includes(q),
+    [
+      s.txCode,
+      s.items.map((item) => item.name).join(' '),
+      s.branch_name,
+      new Date(s.created_at).toLocaleString(),
+    ]
+      .join(' ')
+      .toLowerCase()
+      .includes(q),
   )
 })
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredSales.value.length / pageSize.value)))
@@ -86,6 +109,10 @@ const pagedSales = computed(() => {
 })
 const showingFrom = computed(() => (filteredSales.value.length === 0 ? 0 : (page.value - 1) * pageSize.value + 1))
 const showingTo = computed(() => Math.min(page.value * pageSize.value, filteredSales.value.length))
+const totalTransactions = computed(() => filteredSales.value.length)
+const totalUnitsSold = computed(() => filteredSales.value.reduce((sum, tx) => sum + tx.total_qty, 0))
+const totalRevenue = computed(() => filteredSales.value.reduce((sum, tx) => sum + tx.total_amount, 0))
+const totalProductLines = computed(() => filteredSales.value.reduce((sum, tx) => sum + tx.items.length, 0))
 
 watch([sales, searchTerm, pageSize], () => {
   if (page.value < 1) page.value = 1
@@ -94,10 +121,10 @@ watch([sales, searchTerm, pageSize], () => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div>
-      <h1 class="text-2xl font-bold text-brand-950">📈 Sales history</h1>
-      <p class="text-sm text-brand-700">
+  <div class="space-y-6 rounded-2xl border border-brand-200 bg-white p-4 shadow-sm sm:p-6">
+    <div class="rounded-xl border border-brand-200 bg-white p-4 sm:p-6">
+      <h1 class="text-2xl font-bold tracking-tight text-brand-900">Sales History</h1>
+      <p class="mt-1 text-sm text-brand-700">
         <span v-if="isOwner">All transactions.</span>
         <span v-else>All transactions for your assigned branch.</span>
       </p>
@@ -105,6 +132,25 @@ watch([sales, searchTerm, pageSize], () => {
 
     <div v-if="!isOwner && !branchId" class="rounded-lg border border-dashed border-brand-300 bg-white px-4 py-3 text-sm text-brand-700">
       You are not assigned to a branch yet. Ask owner to assign your account in Team.
+    </div>
+
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div class="rounded-xl border border-brand-200 bg-white p-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Transactions</p>
+        <p class="mt-1 text-2xl font-bold text-brand-900">{{ totalTransactions }}</p>
+      </div>
+      <div class="rounded-xl border border-brand-200 bg-white p-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Units sold</p>
+        <p class="mt-1 text-2xl font-bold text-brand-900">{{ totalUnitsSold }}</p>
+      </div>
+      <div class="rounded-xl border border-brand-200 bg-white p-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Product lines</p>
+        <p class="mt-1 text-2xl font-bold text-brand-900">{{ totalProductLines }}</p>
+      </div>
+      <div class="rounded-xl border border-brand-200 bg-brand-50 p-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-brand-700">Revenue total</p>
+        <p class="mt-1 text-2xl font-bold text-brand-900">{{ format(totalRevenue) }}</p>
+      </div>
     </div>
 
     <div class="rounded-xl border border-brand-200 bg-white shadow-sm">
@@ -142,7 +188,7 @@ watch([sales, searchTerm, pageSize], () => {
                 {{ new Date(s.created_at).toLocaleString() }}
               </td>
               <td class="max-w-[320px] px-4 py-2 font-medium text-brand-950">
-                <span :title="s.products.join(', ')">{{ productsPreview(s.products) }}</span>
+                <span :title="s.items.map((item) => `${item.name} x${item.qty}`).join(', ')">{{ productsPreview(s.items) }}</span>
               </td>
               <td class="px-4 py-2 text-brand-800">{{ s.branch_name }}</td>
               <td class="px-4 py-2 text-right tabular-nums">{{ s.total_qty }}</td>
@@ -185,9 +231,40 @@ watch([sales, searchTerm, pageSize], () => {
           </div>
           <button type="button" class="rounded border border-brand-300 px-3 py-1.5 text-sm font-semibold text-brand-900 hover:bg-brand-50" @click="selectedTx = null">Close</button>
         </div>
-        <ul class="max-h-72 space-y-1 overflow-y-auto rounded border border-brand-100 p-3 text-sm">
-          <li v-for="(item, idx) in selectedTx.products" :key="idx" class="text-brand-900">{{ item }}</li>
-        </ul>
+        <div class="mb-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+          <div class="rounded-lg border border-brand-100 bg-brand-50 px-3 py-2">
+            <p class="text-brand-700">Items</p>
+            <p class="font-semibold text-brand-900">{{ selectedTx.items.length }}</p>
+          </div>
+          <div class="rounded-lg border border-brand-100 bg-brand-50 px-3 py-2">
+            <p class="text-brand-700">Total qty</p>
+            <p class="font-semibold text-brand-900">{{ selectedTx.total_qty }}</p>
+          </div>
+          <div class="rounded-lg border border-brand-100 bg-brand-50 px-3 py-2">
+            <p class="text-brand-700">Transaction total</p>
+            <p class="font-semibold text-brand-900">{{ format(selectedTx.total_amount) }}</p>
+          </div>
+        </div>
+        <div class="max-h-72 overflow-y-auto rounded border border-brand-100">
+          <table class="min-w-full text-sm">
+            <thead class="bg-brand-50 text-brand-800">
+              <tr>
+                <th class="px-3 py-2 text-left">Product</th>
+                <th class="px-3 py-2 text-right">Qty</th>
+                <th class="px-3 py-2 text-right">Price</th>
+                <th class="px-3 py-2 text-right">Line total</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-brand-100">
+              <tr v-for="(item, idx) in selectedTx.items" :key="idx">
+                <td class="px-3 py-2 text-brand-900">{{ item.name }}</td>
+                <td class="px-3 py-2 text-right tabular-nums text-brand-900">{{ item.qty }}</td>
+                <td class="px-3 py-2 text-right tabular-nums text-brand-900">{{ format(item.unitPrice) }}</td>
+                <td class="px-3 py-2 text-right tabular-nums font-semibold text-brand-900">{{ format(item.lineTotal) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>

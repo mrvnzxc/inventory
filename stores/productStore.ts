@@ -135,6 +135,88 @@ export const useProductStore = defineStore('products', () => {
     return data
   }
 
+  async function updateCategory(categoryId: string, name: string) {
+    const supabase = useSupabaseClient()
+    const next = name.trim()
+    if (!next) throw new Error('Category name is required')
+    const { data, error } = await supabase
+      .from('categories')
+      .update({ name: next })
+      .eq('id', categoryId)
+      .select('id, name')
+      .single()
+    if (error) throw new Error(postgrestErrorMessage(error))
+    await fetchCategories()
+    return data
+  }
+
+  async function deleteCategory(categoryId: string) {
+    const supabase = useSupabaseClient()
+    const [{ count: subCount, error: subErr }, { count: productCount, error: prodErr }] = await Promise.all([
+      supabase
+        .from('subcategories')
+        .select('id', { head: true, count: 'exact' })
+        .eq('category_id', categoryId),
+      supabase
+        .from('products')
+        .select('id', { head: true, count: 'exact' })
+        .eq('category_id', categoryId)
+        .is('deleted_at', null),
+    ])
+    if (subErr) throw new Error(postgrestErrorMessage(subErr))
+    if (prodErr) throw new Error(postgrestErrorMessage(prodErr))
+    if ((productCount ?? 0) > 0) {
+      throw new Error('Cannot delete category while active products still use it.')
+    }
+    if ((subCount ?? 0) > 0) {
+      throw new Error('Delete its subcategories first before deleting this category.')
+    }
+    const { error } = await supabase.from('categories').delete().eq('id', categoryId)
+    if (error) throw new Error(postgrestErrorMessage(error))
+    await fetchCategories()
+    await fetchSubcategories()
+    await fetchManagerSubcategories(null)
+  }
+
+  async function updateSubcategory(subcategoryId: string, name: string) {
+    const supabase = useSupabaseClient()
+    const next = name.trim()
+    if (!next) throw new Error('Subcategory name is required')
+    const { data, error } = await supabase
+      .from('subcategories')
+      .update({ name: next })
+      .eq('id', subcategoryId)
+      .select('id, category_id, name')
+      .single()
+    if (error) throw new Error(postgrestErrorMessage(error))
+    await fetchSubcategories(data.category_id)
+    await fetchManagerSubcategories(data.category_id)
+    return data
+  }
+
+  async function deleteSubcategory(subcategoryId: string) {
+    const supabase = useSupabaseClient()
+    const { data: sub, error: subErr } = await supabase
+      .from('subcategories')
+      .select('id, category_id, name')
+      .eq('id', subcategoryId)
+      .single()
+    if (subErr) throw new Error(postgrestErrorMessage(subErr))
+    const { count: productCount, error: prodErr } = await supabase
+      .from('products')
+      .select('id', { head: true, count: 'exact' })
+      .eq('subcategory_id', subcategoryId)
+      .is('deleted_at', null)
+    if (prodErr) throw new Error(postgrestErrorMessage(prodErr))
+    if ((productCount ?? 0) > 0) {
+      throw new Error('Cannot delete subcategory while active products still use it.')
+    }
+    const { error } = await supabase.from('subcategories').delete().eq('id', subcategoryId)
+    if (error) throw new Error(postgrestErrorMessage(error))
+    await fetchSubcategories(sub.category_id)
+    await fetchManagerSubcategories(sub.category_id)
+  }
+
   async function createProduct(payload: {
     branch_id: string
     category_id: string
@@ -255,6 +337,10 @@ export const useProductStore = defineStore('products', () => {
     fetchManagerSubcategories,
     createCategory,
     createSubcategory,
+    updateCategory,
+    deleteCategory,
+    updateSubcategory,
+    deleteSubcategory,
     createProduct,
     updateProductPrice,
     updateProduct,

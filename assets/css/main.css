@@ -5,3 +5,55 @@
 html {
   @apply antialiased;
 }
+
+body {
+  background: #fff;
+  color: #000;
+}
+
+/* Keep the app clean: remove tinted panel/section backgrounds globally. */
+[class*='bg-gradient-to'] {
+  background-image: none !important;
+  background-color: #fff !important;
+}
+
+[class*='bg-brand-50'],
+[class*='bg-yellow-50'],
+[class*='bg-amber-50'],
+[class*='bg-lime-50'],
+[class*='bg-fuchsia-50'],
+[class*='bg-sky-50'],
+[class*='bg-violet-50'] {
+  background-color: #fff !important;
+}
+
+/* Force readable, consistent black text across pages. */
+[class*='text-brand-'],
+[class*='text-yellow-'],
+[class*='text-amber-'],
+[class*='text-lime-'],
+[class*='text-fuchsia-'],
+[class*='text-sky-'],
+[class*='text-violet-'] {
+  color: #000 !important;
+}
+
+/* Use clean black borders/dividers across all pages/cards/inputs. */
+[class*='border-brand-'],
+[class*='border-yellow-'],
+[class*='border-amber-'],
+[class*='border-lime-'],
+[class*='border-fuchsia-'],
+[class*='border-sky-'],
+[class*='border-violet-'] {
+  border-color: #fde047 !important;
+}
+
+[class*='divide-brand-'] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #fde047 !important;
+}
+
+/* Cleaner tables: remove row lines inside table bodies. */
+table tbody[class*='divide-'] > :not([hidden]) ~ :not([hidden]) {
+  border-color: transparent !important;
+}
