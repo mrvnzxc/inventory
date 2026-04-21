@@ -259,9 +259,10 @@ function productCardBackgroundStyle(raw: string | null | undefined) {
             class="pointer-events-none absolute inset-0 bg-cover bg-center opacity-55"
             :style="productCardBackgroundStyle(p.image_url)"
           />
+          <!-- No bg-gradient-to-* here: global main.css strips gradients and forces solid white, which hid the image. -->
           <div
             v-if="resolveProductImageUrl(p.image_url)"
-            class="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/35 via-white/55 to-white/75"
+            class="pointer-events-none absolute inset-0 bg-white/50"
           />
           <div class="relative min-w-0 flex-1">
             <h3 class="font-semibold leading-snug text-brand-950">{{ p.name }}</h3>
