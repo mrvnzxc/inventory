@@ -3,12 +3,13 @@ import type { InventoryRow } from '~/types/models'
 export const useInventoryStore = defineStore('inventory', () => {
   const rows = ref<InventoryRow[]>([])
   const loading = ref(false)
+  const lastBranchFilter = ref<string | null>(null)
 
-  async function fetchInventory() {
+  async function fetchInventory(branchId?: string | null) {
     const supabase = useSupabaseClient()
     loading.value = true
     try {
-      const { data, error } = await supabase
+      let q = supabase
         .from('inventory')
         .select(
           `
@@ -30,6 +31,9 @@ export const useInventoryStore = defineStore('inventory', () => {
         `,
         )
         .order('updated_at', { ascending: false })
+      lastBranchFilter.value = branchId && branchId.trim() !== '' ? branchId : null
+      if (lastBranchFilter.value) q = q.eq('branch_id', lastBranchFilter.value)
+      const { data, error } = await q
       if (error) throw error
       rows.value = (data ?? []) as InventoryRow[]
     } finally {
@@ -44,7 +48,7 @@ export const useInventoryStore = defineStore('inventory', () => {
       .update({ stock, updated_at: new Date().toISOString() })
       .eq('id', inventoryId)
     if (error) throw error
-    await fetchInventory()
+    await fetchInventory(lastBranchFilter.value)
   }
 
   return {

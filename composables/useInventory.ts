@@ -3,7 +3,7 @@ export function useInventory() {
   return {
     rows: computed(() => store.rows),
     loading: computed(() => store.loading),
-    fetchInventory: () => store.fetchInventory(),
+    fetchInventory: (branchId?: string | null) => store.fetchInventory(branchId),
     adjustStock: store.adjustStock,
   }
 }

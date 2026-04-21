@@ -20,6 +20,13 @@ const effectiveBranchId = computed(() =>
   isOwner.value ? ownerFocusBranchId.value : branchId.value,
 )
 
+async function refreshBranchData() {
+  await Promise.all([
+    productStore.fetchProducts(effectiveBranchId.value ?? null),
+    inventoryStore.fetchInventory(effectiveBranchId.value ?? null),
+  ])
+}
+
 function stockForProduct(productId: string): number {
   const b = effectiveBranchId.value
   if (!b) return 0
@@ -60,6 +67,16 @@ const availableSubcategories = computed(() => {
   }
   return [...map.entries()].map(([id, name]) => ({ id, name }))
 })
+const availableCategories = computed(() => {
+  const map = new Map<string, string>()
+  for (const p of productStore.products) {
+    if (!p.category_id) continue
+    map.set(p.category_id, p.categories?.name ?? 'Category')
+  }
+  return [...map.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+})
 
 const filteredProducts = computed(() => {
   let list = productStore.products
@@ -96,8 +113,7 @@ onMounted(async () => {
   await loadProfile()
   await loadBranches()
   await productStore.fetchCategories()
-  await productStore.fetchProducts()
-  await inventoryStore.fetchInventory()
+  await refreshBranchData()
 })
 
 watch(ownerFocusBranchId, async () => {
@@ -105,8 +121,7 @@ watch(ownerFocusBranchId, async () => {
   clearCart()
   categoryFilter.value = 'all'
   subcategoryFilter.value = 'all'
-  await productStore.fetchProducts()
-  await inventoryStore.fetchInventory()
+  await refreshBranchData()
 })
 
 watch(branchId, async () => {
@@ -114,8 +129,7 @@ watch(branchId, async () => {
   clearCart()
   categoryFilter.value = 'all'
   subcategoryFilter.value = 'all'
-  await productStore.fetchProducts()
-  await inventoryStore.fetchInventory()
+  await refreshBranchData()
 })
 
 watch(categoryFilter, () => {
@@ -148,7 +162,7 @@ async function submitSale() {
       showConfirmButton: false,
     })
     clearCart()
-    await Promise.all([productStore.fetchProducts(), inventoryStore.fetchInventory()])
+    await refreshBranchData()
   } catch (e: unknown) {
     await Swal.fire({ icon: 'error', title: 'Sale failed', text: e instanceof Error ? e.message : 'Sale failed' })
   } finally {
@@ -205,7 +219,7 @@ function productCardBackgroundStyle(raw: string | null | undefined) {
             :disabled="isOwner && !ownerFocusBranchId"
           >
             <option value="all">All categories</option>
-            <option v-for="c in productStore.categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+            <option v-for="c in availableCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
         </div>
         <div class="w-full md:w-auto">

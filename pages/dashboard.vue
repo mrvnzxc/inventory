@@ -19,22 +19,34 @@ const lowStockPage = ref(1)
 const lowStockPageSize = 12
 const loading = ref(true)
 
+const effectiveBranchId = computed(() => (isOwner.value ? ownerFocusBranchId.value : branchId.value))
+
 async function loadDashboard() {
   loading.value = true
   try {
     await loadProfile()
     await loadBranches()
-    await Promise.all([productStore.fetchProducts(), inventoryStore.fetchInventory(), salesStore.fetchSales(isOwner.value ? undefined : { branchOnly: true })])
-    const threshold = thresholdValue
-    let inv = inventoryStore.rows
-    if (isOwner.value && ownerFocusBranchId.value) {
-      inv = inv.filter((r) => r.branch_id === ownerFocusBranchId.value)
+    const b = effectiveBranchId.value
+    await Promise.all([
+      productStore.fetchProducts(b ?? null),
+      inventoryStore.fetchInventory(b ?? null),
+      b
+        ? salesStore.fetchSales(isOwner.value ? { branchId: b } : { branchOnly: true })
+        : Promise.resolve(),
+    ])
+    if (!b) {
+      salesStore.sales = []
+      currentInventoryRows.value = []
+      stats.value = await salesStore.computeDashboard([], thresholdValue, null)
+      weeklySeries.value = []
+      topProducts.value = []
+      return
     }
+    const threshold = thresholdValue
+    const inv = inventoryStore.rows
     currentInventoryRows.value = inv
-    stats.value = await salesStore.computeDashboard(inv, threshold)
-    const filteredSales = salesStore.sales.filter((s) =>
-      isOwner.value ? !ownerFocusBranchId.value || s.branch_id === ownerFocusBranchId.value : s.branch_id === branchId.value,
-    )
+    stats.value = await salesStore.computeDashboard(inv, threshold, b)
+    const filteredSales = salesStore.sales
     const today = new Date()
     const keys: string[] = []
     for (let i = 6; i >= 0; i--) {

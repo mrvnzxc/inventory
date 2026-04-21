@@ -1,9 +1,12 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
 
-const { isOwner, loadProfile, loadBranches, branchId } = useAuth()
+const { isOwner, loadProfile, loadBranches, branchId, ownerFocusBranchId } = useAuth()
 const { format } = useMoney()
 const { sales, loading, fetchSales } = useSales()
+const salesStore = useSalesStore()
+
+const effectiveBranchId = computed(() => (isOwner.value ? ownerFocusBranchId.value : branchId.value))
 const page = ref(1)
 const pageSize = ref(10)
 const searchTerm = ref('')
@@ -28,10 +31,24 @@ function productsPreview(items: { name: string; qty: number }[]) {
   return `${joined.slice(0, max)}...`
 }
 
+async function loadSalesForBranch() {
+  if (!effectiveBranchId.value) {
+    salesStore.sales = []
+    return
+  }
+  await fetchSales(
+    isOwner.value ? { branchId: effectiveBranchId.value } : { branchOnly: true },
+  )
+}
+
 onMounted(async () => {
   await loadProfile()
   await loadBranches()
-  await fetchSales(isOwner.value ? undefined : { branchOnly: true })
+  await loadSalesForBranch()
+})
+
+watch(effectiveBranchId, () => {
+  loadSalesForBranch()
 })
 
 const groupedSales = computed(() => {

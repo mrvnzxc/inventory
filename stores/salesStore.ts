@@ -20,7 +20,7 @@ export const useSalesStore = defineStore('sales', () => {
   const sales = ref<Sale[]>([])
   const loading = ref(false)
 
-  async function fetchSales(options?: { mineOnly?: boolean; branchOnly?: boolean }) {
+  async function fetchSales(options?: { mineOnly?: boolean; branchOnly?: boolean; branchId?: string | null }) {
     const supabase = useSupabaseClient()
     const user = useSupabaseUser()
     const authStore = useAuthStore()
@@ -46,8 +46,9 @@ export const useSalesStore = defineStore('sales', () => {
       if (options?.mineOnly && user.value) {
         q = q.eq('sold_by', user.value.id)
       }
-      if (options?.branchOnly && authStore.branchId) {
-        q = q.eq('branch_id', authStore.branchId)
+      const branchFilter = options?.branchId ?? (options?.branchOnly ? authStore.branchId : null)
+      if (branchFilter) {
+        q = q.eq('branch_id', branchFilter)
       }
       const { data, error } = await q
       if (error) throw error
@@ -101,22 +102,38 @@ export const useSalesStore = defineStore('sales', () => {
     return { count: rows.length }
   }
 
-  async function computeDashboard(inventoryRows: InventoryRow[], threshold: number): Promise<DashboardStats> {
+  async function computeDashboard(
+    inventoryRows: InventoryRow[],
+    threshold: number,
+    branchId?: string | null,
+  ): Promise<DashboardStats> {
+    if (!branchId) {
+      return {
+        dailyTotal: 0,
+        weeklyTotal: 0,
+        byBranch: [],
+        lowStock: [],
+      }
+    }
     const supabase = useSupabaseClient()
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-    const { data: daySales, error: e1 } = await supabase
+    let dayQ = supabase
       .from('sales')
       .select('product_id, quantity, unit_price, products(price)')
       .gte('created_at', startOfDay)
+    if (branchId) dayQ = dayQ.eq('branch_id', branchId)
+    const { data: daySales, error: e1 } = await dayQ
     if (e1) throw e1
 
-    const { data: weekSales, error: e2 } = await supabase
+    let weekQ = supabase
       .from('sales')
       .select('product_id, quantity, unit_price, branch_id, branches(name), products(price)')
       .gte('created_at', weekAgo)
+    if (branchId) weekQ = weekQ.eq('branch_id', branchId)
+    const { data: weekSales, error: e2 } = await weekQ
     if (e2) throw e2
 
     const sumRevenue = (rows: { product_id: string; quantity: number; unit_price?: number | null; products?: { price?: number | null } | null }[]) =>

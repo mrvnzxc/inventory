@@ -24,6 +24,7 @@ const links = computed(() => {
   }
   base.push({ to: '/account/password', label: 'Change password', icon: 'mdi:lock-reset' })
   return base
+  
 })
 
 function isActive(path: string) {

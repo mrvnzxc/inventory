@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 definePageMeta({ layout: 'default' })
 
 const authStore = useAuthStore()
+const { ownerFocusBranchId } = useAuth()
 const toast = useToast()
 const {
   products,
@@ -29,15 +30,32 @@ onMounted(async () => {
     await navigateTo('/dashboard')
     return
   }
-  await Promise.all([fetchCategories(), fetchProducts()])
+  await fetchCategories()
+  await fetchProducts(ownerFocusBranchId.value ?? null)
+})
+
+watch(ownerFocusBranchId, async (id) => {
+  selectedCategoryId.value = ''
+  await fetchProducts(id ?? null)
 })
 
 watch(selectedCategoryId, (id) => {
   fetchManagerSubcategories(id || null)
 })
 
+const branchCategories = computed(() => {
+  const map = new Map<string, string>()
+  for (const p of products.value) {
+    if (!p.category_id) continue
+    map.set(p.category_id, p.categories?.name ?? 'Category')
+  }
+  const out = [...map.entries()].map(([id, name]) => ({ id, name }))
+  out.sort((a, b) => a.name.localeCompare(b.name))
+  return out
+})
+
 const selectedCategoryName = computed(
-  () => categories.value.find((c) => c.id === selectedCategoryId.value)?.name ?? '',
+  () => branchCategories.value.find((c) => c.id === selectedCategoryId.value)?.name ?? '',
 )
 
 const categoryUsageCount = computed(() => {
@@ -71,6 +89,8 @@ async function renameCategory(id: string, currentName: string) {
   if (!res.isConfirmed) return
   try {
     await updateCategory(id, String(res.value ?? ''))
+    await fetchCategories()
+    await fetchProducts(ownerFocusBranchId.value ?? null)
     toast.push('Category updated', 'success')
   } catch (e: unknown) {
     toast.push(e instanceof Error ? e.message : 'Failed to update category', 'error')
@@ -90,6 +110,8 @@ async function removeCategory(id: string, name: string) {
   try {
     await deleteCategory(id)
     if (selectedCategoryId.value === id) selectedCategoryId.value = ''
+    await fetchCategories()
+    await fetchProducts(ownerFocusBranchId.value ?? null)
     toast.push('Category deleted', 'success')
   } catch (e: unknown) {
     toast.push(e instanceof Error ? e.message : 'Failed to delete category', 'error')
@@ -109,7 +131,7 @@ async function renameSubcategory(id: string, currentName: string) {
   if (!res.isConfirmed) return
   try {
     await updateSubcategory(id, String(res.value ?? ''))
-    await fetchProducts()
+    await fetchProducts(ownerFocusBranchId.value ?? null)
     toast.push('Subcategory updated', 'success')
   } catch (e: unknown) {
     toast.push(e instanceof Error ? e.message : 'Failed to update subcategory', 'error')
@@ -128,7 +150,7 @@ async function removeSubcategory(id: string, name: string) {
   if (!res.isConfirmed) return
   try {
     await deleteSubcategory(id)
-    await fetchProducts()
+    await fetchProducts(ownerFocusBranchId.value ?? null)
     toast.push('Subcategory deleted', 'success')
   } catch (e: unknown) {
     toast.push(e instanceof Error ? e.message : 'Failed to delete subcategory', 'error')
@@ -146,9 +168,10 @@ async function removeSubcategory(id: string, name: string) {
     <div class="grid gap-6 lg:grid-cols-2">
       <section class="rounded-xl border border-brand-200 bg-white p-4 shadow-sm">
         <h2 class="text-base font-bold text-brand-900">Categories</h2>
+        <p v-if="!ownerFocusBranchId" class="mt-2 text-xs text-brand-600">Select a branch in the sidebar to manage categories for that branch.</p>
         <ul class="mt-4 space-y-2">
           <li
-            v-for="c in categories"
+            v-for="c in branchCategories"
             :key="c.id"
             class="flex items-center justify-between gap-3 rounded-lg border border-brand-100 px-3 py-2"
           >
@@ -191,7 +214,7 @@ async function removeSubcategory(id: string, name: string) {
             class="mt-1 w-full rounded-lg border border-brand-300 px-3 py-2 text-sm"
           >
             <option value="">Select category</option>
-            <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+            <option v-for="c in branchCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
         </div>
         <p v-if="selectedCategoryId" class="mt-2 text-xs text-brand-600">Category: {{ selectedCategoryName }}</p>

@@ -3,7 +3,8 @@ export function useSales() {
   return {
     sales: computed(() => store.sales),
     loading: computed(() => store.loading),
-    fetchSales: (opts?: { mineOnly?: boolean; branchOnly?: boolean }) => store.fetchSales(opts),
+    fetchSales: (opts?: { mineOnly?: boolean; branchOnly?: boolean; branchId?: string | null }) =>
+      store.fetchSales(opts),
     createSale: store.createSale,
     createSalesBatch: store.createSalesBatch,
     computeDashboard: store.computeDashboard,

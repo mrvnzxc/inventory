@@ -17,14 +17,28 @@ const lowStockThreshold = Number(config.public.lowStockThreshold ?? 10)
 const editingId = ref<string | null>(null)
 const editingStock = ref('')
 
+const effectiveBranchId = computed(() =>
+  isOwner.value ? ownerFocusBranchId.value : branchId.value,
+)
+
+async function refreshInventoryForBranch() {
+  await fetchInventory(effectiveBranchId.value ?? null)
+}
+
 onMounted(async () => {
   try {
     await loadProfile()
     await loadBranches()
-    await fetchInventory()
+    await refreshInventoryForBranch()
   } catch (e: unknown) {
     toast.push(e instanceof Error ? e.message : 'Failed to load inventory', 'error')
   }
+})
+
+watch(effectiveBranchId, () => {
+  refreshInventoryForBranch().catch((e: unknown) =>
+    toast.push(e instanceof Error ? e.message : 'Failed to load inventory', 'error'),
+  )
 })
 
 const visibleRows = computed(() => {

@@ -402,6 +402,27 @@ const filteredCatalogProducts = computed(() => {
   }
   return list
 })
+const branchCategoryOptions = computed(() => {
+  const map = new Map<string, string>()
+  for (const p of products.value) {
+    if (!p.category_id) continue
+    map.set(p.category_id, p.categories?.name ?? 'Category')
+  }
+  const keepIds = [
+    form.category_id,
+    editForm.category_id,
+    subCatCategoryId.value,
+    catalogCategoryFilter.value !== 'all' ? catalogCategoryFilter.value : '',
+  ].filter(Boolean)
+  for (const id of keepIds) {
+    if (map.has(id)) continue
+    const fallback = categories.value.find((c) => c.id === id)
+    if (fallback) map.set(fallback.id, fallback.name)
+  }
+  return [...map.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+})
 const availableCatalogSubcategories = computed(() => {
   const base =
     catalogCategoryFilter.value === 'all'
@@ -489,7 +510,7 @@ onBeforeUnmount(() => {
             <label class="text-xs text-brand-700">Category</label>
             <select v-model="catalogCategoryFilter" class="mt-1 w-full md:w-64 rounded-lg border border-brand-300 px-3 py-2 text-sm">
               <option value="all">All categories</option>
-              <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+              <option v-for="c in branchCategoryOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
           </div>
           <div class="w-full md:w-auto">
@@ -590,7 +611,7 @@ onBeforeUnmount(() => {
               <label class="text-xs text-brand-700">Category</label>
               <select v-model="form.category_id" class="mt-1 w-full rounded-lg border border-brand-300 px-3 py-2 text-sm">
                 <option value="" disabled>Select</option>
-                <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+                <option v-for="c in branchCategoryOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
               </select>
             </div>
             <div>
@@ -666,7 +687,7 @@ onBeforeUnmount(() => {
               class="mt-1 w-full rounded-lg border border-brand-300 px-3 py-2 text-sm"
             >
               <option value="" disabled>Select</option>
-              <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+              <option v-for="c in branchCategoryOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
           </div>
           <div>
@@ -694,7 +715,7 @@ onBeforeUnmount(() => {
               <label class="text-xs text-brand-700">Category</label>
               <select v-model="editForm.category_id" class="mt-1 w-full rounded-lg border border-brand-300 px-3 py-2 text-sm">
                 <option value="" disabled>Select</option>
-                <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+                <option v-for="c in branchCategoryOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
               </select>
             </div>
             <div>
