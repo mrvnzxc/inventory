@@ -133,8 +133,9 @@ async function onSubmit() {
           <h1
             class="mx-auto max-w-[22rem] text-base font-semibold leading-snug text-neutral-900 text-balance sm:max-w-none sm:text-lg"
           >
-            <span class="bg-gradient-to-r from-[#EAB308] to-[#FACC15] bg-clip-text font-bold text-transparent">ReedGrey</span>
-            Housecare and Personal Care Products Trading
+<span class="font-bold text-amber-700 drop-shadow-sm">
+  ReedGrey
+</span>          Housecare and Personal Care Products Trading
           </h1>
           <p class="mt-6 text-2xl font-bold tracking-tight text-neutral-900 sm:mt-7 sm:text-3xl">Welcome back</p>
           <p class="mt-2 text-sm text-neutral-600">Sign in to manage sales, stock, and branches.</p>
