@@ -461,6 +461,7 @@ onBeforeUnmount(() => {
   <div class="space-y-8">
     <div>
       <h1 class="text-2xl font-bold text-brand-950">🛍️ Products</h1>
+
     </div>
 
     <div v-if="isOwner" class="flex flex-wrap gap-2">
