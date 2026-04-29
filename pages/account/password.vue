@@ -61,9 +61,6 @@ async function changePassword() {
   <div class="mx-auto max-w-xl space-y-6">
     <div>
       <h1 class="text-2xl font-bold text-brand-950">🔐 Change password</h1>
-      <p class="text-sm text-brand-700">
-        Update your sign-in password for this account.
-      </p>
     </div>
 
     <div class="rounded-xl border border-brand-200 bg-white p-5 shadow-sm">

@@ -461,9 +461,6 @@ onBeforeUnmount(() => {
   <div class="space-y-8">
     <div>
       <h1 class="text-2xl font-bold text-brand-950">🛍️ Products</h1>
-      <p class="text-sm text-brand-700">
-        Product catalog first. Use actions below to manage categories or add new products.
-      </p>
     </div>
 
     <div v-if="isOwner" class="flex flex-wrap gap-2">

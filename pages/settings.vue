@@ -162,7 +162,6 @@ async function removeSubcategory(id: string, name: string) {
   <div v-if="authStore.isOwner" class="space-y-6">
     <div>
       <h1 class="text-2xl font-bold text-brand-950">⚙️ Settings</h1>
-      <p class="text-sm text-brand-700">Manage categories and subcategories here so product modals stay clean.</p>
     </div>
 
     <div class="grid gap-6 lg:grid-cols-2">

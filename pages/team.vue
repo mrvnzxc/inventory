@@ -230,7 +230,6 @@ async function createTeamMember() {
   <div v-if="authStore.isOwner" class="space-y-6">
     <div>
       <h1 class="text-2xl font-bold text-brand-950">👥 Team</h1>
-      <p class="text-sm text-brand-700">Assign each salesman to Calumpang or Palengke.</p>
       <button
         type="button"
         class="mt-3 rounded-lg border border-brand-300 bg-white px-3 py-2 text-sm font-semibold text-brand-900 hover:bg-brand-50"

@@ -194,10 +194,6 @@ function productCardBackgroundStyle(raw: string | null | undefined) {
   <div class="mx-auto max-w-6xl space-y-6 pb-32 md:pb-8">
     <div>
       <h1 class="text-2xl font-bold text-brand-950">🧾 Point of sale</h1>
-      <p class="text-sm text-brand-700">
-        <span v-if="isOwner">Choose a category (or all), tap + to add quantities, then complete one sale for the whole cart.</span>
-        <span v-else>Same flow — your branch is fixed. Stock is checked per line.</span>
-      </p>
     </div>
 
     <div v-if="isOwner && ownerFocusBranchId" class="rounded-lg border border-brand-200 bg-white px-4 py-3 text-sm text-brand-900">

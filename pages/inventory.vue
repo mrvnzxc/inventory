@@ -145,10 +145,6 @@ async function saveEdit() {
   <div class="space-y-6">
     <div>
       <h1 class="text-2xl font-bold text-brand-950">📦 Inventory</h1>
-      <p class="text-sm text-brand-700">
-        <span v-if="isOwner">Adjust stock; use the header “Monitor as” filter to focus one branch.</span>
-        <span v-else>Stock for your branch only. You can update stock for your assigned branch.</span>
-      </p>
     </div>
 
     <div class="rounded-xl border border-brand-200 bg-white shadow-sm">
