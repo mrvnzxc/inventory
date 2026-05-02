@@ -16,6 +16,7 @@ export interface Branch {
 export interface Category {
   id: string
   name: string
+  branch_id: string
 }
 
 export interface Subcategory {

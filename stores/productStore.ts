@@ -33,9 +33,14 @@ export const useProductStore = defineStore('products', () => {
   const managerSubcategories = ref<Subcategory[]>([])
   const loading = ref(false)
 
-  async function fetchCategories() {
+  async function fetchCategories(branchFilter?: string | null) {
     const supabase = useSupabaseClient()
-    const { data, error } = await supabase.from('categories').select('id, name').order('name')
+    const authStore = useAuthStore()
+    const effectiveFilter =
+      branchFilter !== undefined ? branchFilter || null : authStore.isOwner ? authStore.ownerFocusBranchId : authStore.branchId
+    let q = supabase.from('categories').select('id, name, branch_id').order('name')
+    if (effectiveFilter) q = q.eq('branch_id', effectiveFilter)
+    const { data, error } = await q
     if (error) throw error
     categories.value = data ?? []
   }
@@ -117,9 +122,16 @@ export const useProductStore = defineStore('products', () => {
 
   async function createCategory(name: string) {
     const supabase = useSupabaseClient()
-    const { data, error } = await supabase.from('categories').insert({ name }).select('id, name').single()
+    const authStore = useAuthStore()
+    const branchId = authStore.isOwner ? authStore.ownerFocusBranchId : authStore.branchId
+    if (!branchId) throw new Error('Select a branch first before adding a category.')
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({ name, branch_id: branchId })
+      .select('id, name, branch_id')
+      .single()
     if (error) throw new Error(postgrestErrorMessage(error))
-    await fetchCategories()
+    await fetchCategories(branchId)
     return data
   }
 

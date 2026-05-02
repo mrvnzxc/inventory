@@ -35,6 +35,7 @@ CREATE TABLE public.salesman_branches (
 
 CREATE TABLE public.categories (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id uuid NOT NULL REFERENCES public.branches (id) ON DELETE RESTRICT,
   name text NOT NULL
 );
 
@@ -237,12 +238,22 @@ CREATE POLICY sb_write ON public.salesman_branches FOR ALL TO authenticated
   USING (public.is_owner()) WITH CHECK (public.is_owner());
 
 -- categories
-CREATE POLICY categories_select ON public.categories FOR SELECT TO authenticated USING (true);
+CREATE POLICY categories_select ON public.categories FOR SELECT TO authenticated
+  USING (public.is_owner() OR branch_id = public.my_branch_id());
 CREATE POLICY categories_write ON public.categories FOR ALL TO authenticated
   USING (public.is_owner()) WITH CHECK (public.is_owner());
 
 -- subcategories
-CREATE POLICY subcategories_select ON public.subcategories FOR SELECT TO authenticated USING (true);
+CREATE POLICY subcategories_select ON public.subcategories FOR SELECT TO authenticated
+  USING (
+    public.is_owner()
+    OR EXISTS (
+      SELECT 1
+      FROM public.categories c
+      WHERE c.id = category_id
+        AND c.branch_id = public.my_branch_id()
+    )
+  );
 CREATE POLICY subcategories_write ON public.subcategories FOR ALL TO authenticated
   USING (public.is_owner()) WITH CHECK (public.is_owner());
 

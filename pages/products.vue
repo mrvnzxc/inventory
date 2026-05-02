@@ -82,6 +82,7 @@ onMounted(async () => {
 })
 
 watch(ownerFocusBranchId, () => {
+  fetchCategories()
   fetchProducts()
 })
 
@@ -100,7 +101,9 @@ async function addCategory() {
     return
   }
   try {
-    await createCategory(name)
+    const created = await createCategory(name)
+    subCatCategoryId.value = created.id
+    if (!form.category_id) form.category_id = created.id
     newCategory.value = ''
     toast.push('Category added', 'success')
   } catch (e: unknown) {
@@ -404,9 +407,13 @@ const filteredCatalogProducts = computed(() => {
 })
 const branchCategoryOptions = computed(() => {
   const map = new Map<string, string>()
+  for (const c of categories.value) {
+    if (!c.id) continue
+    map.set(c.id, c.name ?? 'Category')
+  }
   for (const p of products.value) {
     if (!p.category_id) continue
-    map.set(p.category_id, p.categories?.name ?? 'Category')
+    if (!map.has(p.category_id)) map.set(p.category_id, p.categories?.name ?? 'Category')
   }
   const keepIds = [
     form.category_id,

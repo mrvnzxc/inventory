@@ -104,7 +104,6 @@ const pagedLowStockRows = computed(() => {
   const start = (lowStockPage.value - 1) * lowStockPageSize
   return lowStockRows.value.slice(start, start + lowStockPageSize)
 })
-
 </script>
 
 <template>
@@ -120,15 +119,15 @@ const pagedLowStockRows = computed(() => {
     <div v-if="loading" class="text-brand-700">Loading…</div>
 
     <div v-else class="grid min-w-0 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <div class="min-w-0 rounded-xl border-0 border-l-4 border-l-yellow-500 bg-white p-4 shadow-sm sm:p-5">
+      <div class="min-w-0 rounded-xl border-0 border-l-4 border-l-yellow-500 bg-white p-4 shadow-md sm:p-5">
         <p class="text-sm font-medium text-yellow-700">Today revenue</p>
         <p class="mt-2 text-2xl font-bold text-yellow-800">{{ format(stats?.dailyTotal ?? 0) }}</p>
       </div>
-      <div class="min-w-0 rounded-xl border-0 border-l-4 border-l-amber-500 bg-white p-4 shadow-sm sm:p-5">
+      <div class="min-w-0 rounded-xl border-0 border-l-4 border-l-amber-500 bg-white p-4 shadow-md sm:p-5">
         <p class="text-sm font-medium text-amber-700">Last 7 days revenue</p>
         <p class="mt-2 text-2xl font-bold text-amber-800">{{ format(stats?.weeklyTotal ?? 0) }}</p>
       </div>
-      <div class="min-w-0 rounded-xl border-0 border-l-4 border-l-lime-500 bg-white p-4 shadow-sm sm:p-5">
+      <div class="min-w-0 rounded-xl border-0 border-l-4 border-l-lime-500 bg-white p-4 shadow-md sm:p-5">
         <p class="text-sm font-medium text-lime-700">Low stock</p>
         <button type="button" class="mt-2 text-2xl font-bold text-lime-800 hover:underline" @click="lowStockModalOpen = true">
           {{ lowStockRows.length }} SKUs

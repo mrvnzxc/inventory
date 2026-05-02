@@ -114,7 +114,7 @@ async function doSignOut() {
         v-for="l in links"
         :key="l.to"
         :to="l.to"
-        class="rounded-lg py-2.5 text-sm font-semibold transition"
+        class="rounded-lg py-2.5 text-xs font-semibold transition"
         :title="props.collapsed ? l.label : ''"
         :class="[
           props.collapsed ? 'flex items-center justify-center px-2' : 'flex items-center gap-2 px-3',
@@ -123,7 +123,7 @@ async function doSignOut() {
             : 'text-neutral-900 hover:bg-[#FEF08A]',
         ]"
       >
-        <Icon :icon="l.icon" class="h-5 w-5 shrink-0" />
+        <Icon :icon="l.icon" class="h-4 w-4 shrink-0" />
         <span v-if="!props.collapsed" class="block truncate">{{ l.label }}</span>
       </NuxtLink>
     </nav>

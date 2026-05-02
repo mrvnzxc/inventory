@@ -30,12 +30,13 @@ onMounted(async () => {
     await navigateTo('/dashboard')
     return
   }
-  await fetchCategories()
+  await fetchCategories(ownerFocusBranchId.value ?? null)
   await fetchProducts(ownerFocusBranchId.value ?? null)
 })
 
 watch(ownerFocusBranchId, async (id) => {
   selectedCategoryId.value = ''
+  await fetchCategories(id ?? null)
   await fetchProducts(id ?? null)
 })
 
@@ -45,9 +46,13 @@ watch(selectedCategoryId, (id) => {
 
 const branchCategories = computed(() => {
   const map = new Map<string, string>()
+  for (const c of categories.value) {
+    if (!c.id) continue
+    map.set(c.id, c.name ?? 'Category')
+  }
   for (const p of products.value) {
     if (!p.category_id) continue
-    map.set(p.category_id, p.categories?.name ?? 'Category')
+    if (!map.has(p.category_id)) map.set(p.category_id, p.categories?.name ?? 'Category')
   }
   const out = [...map.entries()].map(([id, name]) => ({ id, name }))
   out.sort((a, b) => a.name.localeCompare(b.name))
@@ -57,6 +62,7 @@ const branchCategories = computed(() => {
 const selectedCategoryName = computed(
   () => branchCategories.value.find((c) => c.id === selectedCategoryId.value)?.name ?? '',
 )
+const selectedCategory = computed(() => branchCategories.value.find((c) => c.id === selectedCategoryId.value) ?? null)
 
 const categoryUsageCount = computed(() => {
   const map = new Map<string, number>()
@@ -168,55 +174,42 @@ async function removeSubcategory(id: string, name: string) {
       <section class="rounded-xl border border-brand-200 bg-white p-4 shadow-sm">
         <h2 class="text-base font-bold text-brand-900">Categories</h2>
         <p v-if="!ownerFocusBranchId" class="mt-2 text-xs text-brand-600">Select a branch in the sidebar to manage categories for that branch.</p>
-        <ul class="mt-4 space-y-2">
-          <li
-            v-for="c in branchCategories"
-            :key="c.id"
-            class="flex items-center justify-between gap-3 rounded-lg border border-brand-100 px-3 py-2"
-          >
-            <button
-              type="button"
-              class="text-left text-sm font-medium text-brand-900 hover:underline"
-              @click="selectedCategoryId = c.id"
-            >
-              {{ c.name }}
-              <span class="ml-1 text-xs text-brand-600">({{ categoryUsageCount.get(c.id) ?? 0 }} products)</span>
-            </button>
-            <div class="flex gap-2">
-              <button
-                type="button"
-                class="rounded border border-yellow-500 bg-yellow-100 p-1.5 text-black hover:bg-yellow-200"
-                title="Rename category"
-                @click="renameCategory(c.id, c.name)"
-              >
-                <Icon icon="mdi:pencil-outline" class="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                class="rounded border border-red-400 bg-red-50 p-1.5 text-red-700 hover:bg-red-100"
-                title="Delete category"
-                @click="removeCategory(c.id, c.name)"
-              >
-                <Icon icon="mdi:trash-can-outline" class="h-4 w-4" />
-              </button>
-            </div>
-          </li>
-        </ul>
-      </section>
-
-      <section class="rounded-xl border border-brand-200 bg-white p-4 shadow-sm">
-        <h2 class="text-base font-bold text-brand-900">Subcategories</h2>
-        <div class="mt-3">
-          <label class="text-xs text-brand-700">Parent category</label>
+        <div class="mt-4">
+          <label class="text-xs text-brand-700">Category</label>
           <select
             v-model="selectedCategoryId"
             class="mt-1 w-full rounded-lg border border-brand-300 px-3 py-2 text-sm"
           >
             <option value="">Select category</option>
-            <option v-for="c in branchCategories" :key="c.id" :value="c.id">{{ c.name }}</option>
+            <option v-for="c in branchCategories" :key="c.id" :value="c.id">
+              {{ c.name }} ({{ categoryUsageCount.get(c.id) ?? 0 }} products)
+            </option>
           </select>
         </div>
+        <div v-if="selectedCategory" class="mt-3 flex gap-2">
+          <button
+            type="button"
+            class="rounded border border-yellow-500 bg-yellow-100 p-1.5 text-black hover:bg-yellow-200"
+            title="Rename category"
+            @click="renameCategory(selectedCategory.id, selectedCategory.name)"
+          >
+            <Icon icon="mdi:pencil-outline" class="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            class="rounded border border-red-400 bg-red-50 p-1.5 text-red-700 hover:bg-red-100"
+            title="Delete category"
+            @click="removeCategory(selectedCategory.id, selectedCategory.name)"
+          >
+            <Icon icon="mdi:trash-can-outline" class="h-4 w-4" />
+          </button>
+        </div>
+      </section>
+
+      <section class="rounded-xl border border-brand-200 bg-white p-4 shadow-sm">
+        <h2 class="text-base font-bold text-brand-900">Subcategories</h2>
         <p v-if="selectedCategoryId" class="mt-2 text-xs text-brand-600">Category: {{ selectedCategoryName }}</p>
+        <p v-else class="mt-2 text-xs text-brand-600">Select a category from the left panel to view subcategories.</p>
         <ul class="mt-4 space-y-2">
           <li
             v-for="s in managerSubcategories"

@@ -38,7 +38,7 @@ const breadcrumbLabelMap: Record<string, string> = {
 }
 
 const breadcrumbs = computed(() => {
-  const clean = route.path.split('?')[0]
+  const clean = route.path.split('?')[0].split('#')[0]
   const parts = clean.split('/').filter(Boolean)
   const out: { to: string; label: string }[] = [{ to: '/dashboard', label: 'Dashboard' }]
   let cur = ''

@@ -7,7 +7,7 @@ export function useProducts() {
     managerSubcategories: computed(() => store.managerSubcategories),
     loading: computed(() => store.loading),
     fetchProducts: (branchFilter?: string | null) => store.fetchProducts(branchFilter),
-    fetchCategories: () => store.fetchCategories(),
+    fetchCategories: (branchFilter?: string | null) => store.fetchCategories(branchFilter),
     fetchSubcategories: (categoryId?: string) => store.fetchSubcategories(categoryId),
     fetchManagerSubcategories: (categoryId: string | null) => store.fetchManagerSubcategories(categoryId),
     createCategory: (name: string) => store.createCategory(name),
