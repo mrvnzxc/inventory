@@ -48,7 +48,7 @@ CREATE TABLE public.subcategories (
 CREATE TABLE public.products (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id uuid NOT NULL REFERENCES public.branches (id) ON DELETE RESTRICT,
-  category_id uuid NOT NULL REFERENCES public.categories (id) ON DELETE RESTRICT,
+  category_id uuid REFERENCES public.categories (id) ON DELETE SET NULL,
   subcategory_id uuid REFERENCES public.subcategories (id) ON DELETE SET NULL,
   name text NOT NULL,
   price numeric(14, 2),

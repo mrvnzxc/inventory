@@ -61,79 +61,12 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: productsError.message })
   }
 
-  const linked = products ?? []
-  const active = linked.filter((p) => p.deleted_at == null)
+  const active = (products ?? []).filter((p) => p.deleted_at == null)
   if (active.length > 0) {
     throw createError({
       statusCode: 409,
       statusMessage: `Cannot delete: ${active.length} active product(s) still use this category. Reassign or delete them on Products first.`,
     })
-  }
-
-  if (linked.length > 0) {
-    let fallbackId: string | undefined
-    const { data: fallback } = await admin
-      .from('categories')
-      .select('id')
-      .eq('branch_id', cat.branch_id)
-      .neq('id', categoryId)
-      .order('name')
-      .limit(1)
-
-    fallbackId = fallback?.[0]?.id
-
-    if (!fallbackId) {
-      const { data: created, error: createError } = await admin
-        .from('categories')
-        .insert({ branch_id: cat.branch_id, name: 'General' })
-        .select('id')
-        .single()
-      if (createError) {
-        const { data: again } = await admin
-          .from('categories')
-          .select('id')
-          .eq('branch_id', cat.branch_id)
-          .neq('id', categoryId)
-          .order('name')
-          .limit(1)
-        fallbackId = again?.[0]?.id
-        if (!fallbackId) {
-          throw createError({ statusCode: 500, statusMessage: createError.message })
-        }
-      } else {
-        fallbackId = created?.id
-      }
-    }
-
-    if (!fallbackId) {
-      throw createError({
-        statusCode: 500,
-        statusMessage: 'Could not find or create a fallback category',
-      })
-    }
-
-    const { error: moveError } = await admin
-      .from('products')
-      .update({ category_id: fallbackId, subcategory_id: null })
-      .eq('category_id', categoryId)
-    if (moveError) {
-      throw createError({ statusCode: 500, statusMessage: moveError.message })
-    }
-
-    const { data: stillLinked, error: checkError } = await admin
-      .from('products')
-      .select('id')
-      .eq('category_id', categoryId)
-      .limit(1)
-    if (checkError) {
-      throw createError({ statusCode: 500, statusMessage: checkError.message })
-    }
-    if ((stillLinked?.length ?? 0) > 0) {
-      throw createError({
-        statusCode: 500,
-        statusMessage: 'Products still reference this category after reassignment',
-      })
-    }
   }
 
   const { error: deleteError } = await admin.from('categories').delete().eq('id', categoryId)

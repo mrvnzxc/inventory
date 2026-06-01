@@ -88,7 +88,7 @@ function categoryDeleteHint(categoryId: string): string {
     return `${u.active} active product(s) use this category — reassign or delete them on Products before removing the category.`
   }
   if (u.archived > 0) {
-    return `${u.archived} archived product(s) are linked. You can delete this category; those items will be moved to another category (e.g. General) so sales history stays intact.`
+    return `${u.archived} archived product(s) are linked. You can delete this category — they will be unlinked (sales history stays intact).`
   }
   return 'No products use this category. Safe to delete.'
 }
@@ -134,7 +134,7 @@ async function removeCategory(id: string, name: string) {
   }
   const archivedNote =
     u && u.archived > 0
-      ? ` ${u.archived} archived product(s) will be moved to another category in this branch (not deleted — sales history is kept).`
+      ? ` ${u.archived} archived product(s) will be unlinked from this category (not deleted — sales history is kept).`
       : ''
   const res = await Swal.fire({
     icon: 'warning',

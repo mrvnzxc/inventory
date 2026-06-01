@@ -28,7 +28,7 @@ export interface Subcategory {
 export interface Product {
   id: string
   branch_id: string
-  category_id: string
+  category_id: string | null
   subcategory_id: string | null
   name: string
   price: number | null
