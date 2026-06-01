@@ -33,6 +33,17 @@ where email = 'you@example.com';
 
 **If login still fails:** under **Authentication → Providers**, ensure **Email** is enabled.
 
+### Confirmation emails point to localhost
+
+Supabase builds links in signup/reset emails from **Authentication → URL Configuration**:
+
+1. Set **Site URL** to your live app (e.g. `https://your-app.vercel.app`), not `http://localhost:3000`.
+2. Under **Redirect URLs**, add your production URL and paths you use after auth, e.g. `https://your-app.vercel.app/**` and `https://your-app.vercel.app/login`.
+
+On Vercel, set **`NUXT_PUBLIC_SITE_URL`** to the same production URL (optional if you rely on auto `VERCEL_URL`, but recommended for a custom domain). Team signup passes that URL as `email_redirect_to` so new users land on production `/login` after confirming email.
+
+Redeploy after changing env vars. Old emails already sent still contain the old link; create a new user or resend confirmation to test.
+
 ## Local app
 
 ```bash

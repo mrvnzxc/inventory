@@ -25,6 +25,10 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       lowStockThreshold: 10,
+      // Used in auth emails (signup confirm). Set in Vercel to your production URL.
+      siteUrl:
+        process.env.NUXT_PUBLIC_SITE_URL ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : ''),
     },
   },
   tailwindcss: {

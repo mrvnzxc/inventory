@@ -154,6 +154,8 @@ async function createTeamMember() {
     toast.push('Supabase URL/Key is missing in runtime config', 'error')
     return
   }
+  const siteUrl = String(config.public.siteUrl ?? '').replace(/\/$/, '')
+  const emailRedirectTo = siteUrl ? `${siteUrl}/login` : ''
   creating.value = true
   try {
     const res = await $fetch<{ user?: { id?: string }; error_description?: string; msg?: string }>(
@@ -167,6 +169,13 @@ async function createTeamMember() {
         body: {
           email,
           password,
+          ...(emailRedirectTo
+            ? {
+                options: {
+                  email_redirect_to: emailRedirectTo,
+                },
+              }
+            : {}),
         },
       },
     )
