@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Swal from 'sweetalert2'
 import { Icon } from '@iconify/vue'
+import type { CategoryUsage } from '~/stores/productStore'
 
 definePageMeta({ layout: 'default' })
 
@@ -69,17 +70,27 @@ const selectedCategoryName = computed(
 )
 const selectedCategory = computed(() => branchCategories.value.find((c) => c.id === selectedCategoryId.value) ?? null)
 
-function categoryUsageLabel(categoryId: string): string {
-  const u = categoryUsage.value[categoryId]
-  if (!u) return '0 products'
-  if (u.archived === 0) return `${u.active} product${u.active === 1 ? '' : 's'}`
-  if (u.active === 0) return `${u.archived} archived`
-  return `${u.active} active, ${u.archived} archived`
+function categoryUsage(u: CategoryUsage | undefined) {
+  return u ?? { active: 0, archived: 0 }
 }
 
 function canDeleteCategory(categoryId: string): boolean {
-  const u = categoryUsage.value[categoryId]
-  return !u || u.active === 0
+  return categoryUsage(categoryUsage.value[categoryId]).active === 0
+}
+
+const selectedUsage = computed(() =>
+  selectedCategoryId.value ? categoryUsage(categoryUsage.value[selectedCategoryId.value]) : null,
+)
+
+function categoryDeleteHint(categoryId: string): string {
+  const u = categoryUsage(categoryUsage.value[categoryId])
+  if (u.active > 0) {
+    return `${u.active} active product(s) use this category — reassign or delete them on Products before removing the category.`
+  }
+  if (u.archived > 0) {
+    return `${u.archived} archived product(s) are linked. You can delete this category; those items will be moved to another category (e.g. General) so sales history stays intact.`
+  }
+  return 'No products use this category. Safe to delete.'
 }
 
 const subcategoryUsageCount = computed(() => {
@@ -123,12 +134,12 @@ async function removeCategory(id: string, name: string) {
   }
   const archivedNote =
     u && u.archived > 0
-      ? ` ${u.archived} archived product(s) will be moved to another category in this branch.`
+      ? ` ${u.archived} archived product(s) will be moved to another category in this branch (not deleted — sales history is kept).`
       : ''
   const res = await Swal.fire({
     icon: 'warning',
-    title: 'Delete category?',
-    text: `Delete "${name}"? Subcategories under it will be removed.${archivedNote}`,
+    title: 'Permanently delete category?',
+    text: `Remove "${name}" from this branch? Subcategories under it will be removed.${archivedNote}`,
     showCancelButton: true,
     confirmButtonText: 'Delete',
     confirmButtonColor: '#eab308',
@@ -205,11 +216,14 @@ async function removeSubcategory(id: string, name: string) {
           >
             <option value="">Select category</option>
             <option v-for="c in branchCategories" :key="c.id" :value="c.id">
-              {{ c.name }} ({{ categoryUsageLabel(c.id) }})
+              {{ c.name }}
             </option>
           </select>
+          <p v-if="selectedCategoryId && selectedUsage" class="mt-2 text-xs text-brand-600">
+            {{ categoryDeleteHint(selectedCategoryId) }}
+          </p>
         </div>
-        <div v-if="selectedCategory" class="mt-3 flex gap-2">
+        <div v-if="selectedCategory" class="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
             class="rounded border border-yellow-500 bg-yellow-100 p-1.5 text-black hover:bg-yellow-200"
@@ -231,6 +245,14 @@ async function removeSubcategory(id: string, name: string) {
             @click="removeCategory(selectedCategory.id, selectedCategory.name)"
           >
             <Icon icon="mdi:trash-can-outline" class="h-4 w-4" />
+          </button>
+          <button
+            v-if="canDeleteCategory(selectedCategory.id)"
+            type="button"
+            class="rounded-lg border border-red-400 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-800 hover:bg-red-100"
+            @click="removeCategory(selectedCategory.id, selectedCategory.name)"
+          >
+            Delete category permanently
           </button>
         </div>
       </section>
