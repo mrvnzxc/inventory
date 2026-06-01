@@ -23,6 +23,7 @@ export default defineNuxtConfig({
     },
   },
   runtimeConfig: {
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     public: {
       lowStockThreshold: 10,
       // Used in auth emails (signup confirm). Set in Vercel to your production URL.

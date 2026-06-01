@@ -44,6 +44,10 @@ On Vercel, set **`NUXT_PUBLIC_SITE_URL`** to the same production URL (optional i
 
 Redeploy after changing env vars. Old emails already sent still contain the old link; create a new user or resend confirmation to test.
 
+### Team member create fails (“Signup response was incomplete”)
+
+Add **`SUPABASE_SERVICE_ROLE_KEY`** (Project Settings → API → `service_role`, server-only) to `.env` and Vercel. The Team page uses a server route to create users with the admin API so the owner session is not replaced and Supabase returns a reliable user id. Without it, the app falls back to public signup, which often returns the user at the top level of the JSON (not under `user`) when email confirmation is enabled.
+
 ## Local app
 
 ```bash

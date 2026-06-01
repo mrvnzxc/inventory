@@ -148,53 +148,92 @@ async function createTeamMember() {
     toast.push('Password must be at least 6 characters', 'error')
     return
   }
-  const supabaseUrl = String((config.public as { supabase?: { url?: string }; supabaseUrl?: string }).supabase?.url ?? (config.public as { supabaseUrl?: string }).supabaseUrl ?? '')
-  const supabaseAnonKey = String((config.public as { supabase?: { key?: string }; supabaseKey?: string }).supabase?.key ?? (config.public as { supabaseKey?: string }).supabaseKey ?? '')
-  if (!supabaseUrl || !supabaseAnonKey) {
-    toast.push('Supabase URL/Key is missing in runtime config', 'error')
-    return
-  }
-  const siteUrl = String(config.public.siteUrl ?? '').replace(/\/$/, '')
-  const emailRedirectTo = siteUrl ? `${siteUrl}/login` : ''
   creating.value = true
   try {
-    const res = await $fetch<{ user?: { id?: string }; error_description?: string; msg?: string }>(
-      `${supabaseUrl}/auth/v1/signup`,
-      {
+    let newUserId: string | undefined
+
+    try {
+      const adminRes = await $fetch<{ userId: string }>('/api/team/create-member', {
         method: 'POST',
-        headers: {
-          apikey: supabaseAnonKey,
-          Authorization: `Bearer ${supabaseAnonKey}`,
-        },
         body: {
           email,
           password,
-          ...(emailRedirectTo
-            ? {
-                options: {
-                  email_redirect_to: emailRedirectTo,
-                },
-              }
-            : {}),
+          first_name: createForm.first_name,
+          last_name: createForm.last_name,
         },
-      },
-    )
-    let newUserId = res?.user?.id
-    if (!newUserId) {
-      // Signup can succeed but return a payload without user.id.
-      // Verify creation by checking profiles for the same email.
-      for (let i = 0; i < 3 && !newUserId; i++) {
-        await refresh()
-        const created = rows.value.find((r) => (r.email ?? '').toLowerCase() === email)
-        if (created?.id) {
-          newUserId = created.id
-          break
-        }
-        await new Promise((resolve) => setTimeout(resolve, 350))
+      })
+      newUserId = adminRes.userId
+    } catch (adminErr: unknown) {
+      const status =
+        typeof adminErr === 'object' && adminErr != null && 'statusCode' in adminErr
+          ? Number((adminErr as { statusCode?: number }).statusCode)
+          : NaN
+      if (status !== 501) {
+        const msg =
+          typeof adminErr === 'object' && adminErr != null && 'statusMessage' in adminErr
+            ? String((adminErr as { statusMessage?: string }).statusMessage)
+            : fetchErrorMessage(adminErr)
+        throw new Error(msg || 'Failed to create team member')
       }
     }
+
     if (!newUserId) {
-      throw new Error(res?.error_description || res?.msg || 'Signup response was incomplete. Check Supabase Auth logs.')
+      const supabaseUrl = String(
+        (config.public as { supabase?: { url?: string }; supabaseUrl?: string }).supabase?.url
+          ?? (config.public as { supabaseUrl?: string }).supabaseUrl
+          ?? '',
+      )
+      const supabaseAnonKey = String(
+        (config.public as { supabase?: { key?: string }; supabaseKey?: string }).supabase?.key
+          ?? (config.public as { supabaseKey?: string }).supabaseKey
+          ?? '',
+      )
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Supabase URL/Key is missing in runtime config')
+      }
+      const siteUrl = String(config.public.siteUrl ?? '').replace(/\/$/, '')
+      const redirectTo = siteUrl ? `${siteUrl}/login` : ''
+      let res: unknown
+      try {
+        res = await $fetch(`${supabaseUrl}/auth/v1/signup`, {
+          method: 'POST',
+          headers: {
+            apikey: supabaseAnonKey,
+            Authorization: `Bearer ${supabaseAnonKey}`,
+          },
+          body: {
+            email,
+            password,
+            ...(redirectTo ? { redirect_to: redirectTo } : {}),
+          },
+        })
+      } catch (fetchErr: unknown) {
+        throw new Error(fetchErrorMessage(fetchErr) || 'Signup request failed')
+      }
+
+      const signupErr = signupErrorFromResponse(res)
+      if (signupErr) throw new Error(signupErr)
+      if (signupLooksLikeDuplicate(res)) {
+        throw new Error('That email is already registered. Use a different email or sign in as that user.')
+      }
+
+      newUserId = signupUserIdFromResponse(res)
+      if (!newUserId) {
+        for (let i = 0; i < 5 && !newUserId; i++) {
+          await refresh()
+          const created = rows.value.find((r) => (r.email ?? '').toLowerCase() === email)
+          if (created?.id) {
+            newUserId = created.id
+            break
+          }
+          await new Promise((resolve) => setTimeout(resolve, 400))
+        }
+      }
+      if (!newUserId) {
+        throw new Error(
+          'Signup succeeded but no user id was returned. If email confirmation is required, check the inbox — or set SUPABASE_SERVICE_ROLE_KEY for reliable owner-created accounts.',
+        )
+      }
     }
     const { error: ep } = await supabase
       .from('profiles')
