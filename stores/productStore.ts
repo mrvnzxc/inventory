@@ -195,6 +195,29 @@ export const useProductStore = defineStore('products', () => {
   async function deleteCategory(categoryId: string) {
     const supabase = useSupabaseClient()
 
+    try {
+      await $fetch(`/api/categories/${categoryId}`, { method: 'DELETE' })
+      await fetchCategories()
+      await fetchSubcategories()
+      await fetchManagerSubcategories(null)
+      const authStore = useAuthStore()
+      const branchId = authStore.ownerFocusBranchId ?? authStore.branchId
+      if (branchId) await fetchCategoryUsage(branchId)
+      return
+    } catch (apiErr: unknown) {
+      const status =
+        typeof apiErr === 'object' && apiErr != null && 'statusCode' in apiErr
+          ? Number((apiErr as { statusCode?: number }).statusCode)
+          : NaN
+      if (status !== 501) {
+        const msg =
+          typeof apiErr === 'object' && apiErr != null && 'statusMessage' in apiErr
+            ? String((apiErr as { statusMessage?: string }).statusMessage)
+            : fetchErrorMessage(apiErr)
+        throw new Error(msg || 'Failed to delete category')
+      }
+    }
+
     const { error: rpcErr } = await supabase.rpc('delete_category_safe', {
       p_category_id: categoryId,
     })
