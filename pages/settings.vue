@@ -11,7 +11,9 @@ const {
   products,
   categories,
   managerSubcategories,
+  categoryUsage,
   fetchCategories,
+  fetchCategoryUsage,
   fetchManagerSubcategories,
   fetchProducts,
   createCategory,
@@ -30,14 +32,17 @@ onMounted(async () => {
     await navigateTo('/dashboard')
     return
   }
-  await fetchCategories(ownerFocusBranchId.value ?? null)
-  await fetchProducts(ownerFocusBranchId.value ?? null)
+  const branchId = ownerFocusBranchId.value ?? null
+  await fetchCategories(branchId)
+  await fetchProducts(branchId)
+  await fetchCategoryUsage(branchId)
 })
 
 watch(ownerFocusBranchId, async (id) => {
   selectedCategoryId.value = ''
   await fetchCategories(id ?? null)
   await fetchProducts(id ?? null)
+  await fetchCategoryUsage(id ?? null)
 })
 
 watch(selectedCategoryId, (id) => {
@@ -64,14 +69,18 @@ const selectedCategoryName = computed(
 )
 const selectedCategory = computed(() => branchCategories.value.find((c) => c.id === selectedCategoryId.value) ?? null)
 
-const categoryUsageCount = computed(() => {
-  const map = new Map<string, number>()
-  for (const p of products.value) {
-    if (!p.category_id) continue
-    map.set(p.category_id, (map.get(p.category_id) ?? 0) + 1)
-  }
-  return map
-})
+function categoryUsageLabel(categoryId: string): string {
+  const u = categoryUsage.value[categoryId]
+  if (!u) return '0 products'
+  if (u.archived === 0) return `${u.active} product${u.active === 1 ? '' : 's'}`
+  if (u.active === 0) return `${u.archived} archived`
+  return `${u.active} active, ${u.archived} archived`
+}
+
+function canDeleteCategory(categoryId: string): boolean {
+  const u = categoryUsage.value[categoryId]
+  return !u || u.active === 0
+}
 
 const subcategoryUsageCount = computed(() => {
   const map = new Map<string, number>()
@@ -104,10 +113,22 @@ async function renameCategory(id: string, currentName: string) {
 }
 
 async function removeCategory(id: string, name: string) {
+  const u = categoryUsage.value[id]
+  if (u && u.active > 0) {
+    toast.push(
+      `Cannot delete "${name}": ${u.active} active product(s) still use it. Reassign or delete them on Products first.`,
+      'error',
+    )
+    return
+  }
+  const archivedNote =
+    u && u.archived > 0
+      ? ` ${u.archived} archived product(s) will be moved to another category in this branch.`
+      : ''
   const res = await Swal.fire({
     icon: 'warning',
     title: 'Delete category?',
-    text: `Delete "${name}"? This only works when it has no active products and no subcategories.`,
+    text: `Delete "${name}"? Subcategories under it will be removed.${archivedNote}`,
     showCancelButton: true,
     confirmButtonText: 'Delete',
     confirmButtonColor: '#eab308',
@@ -116,8 +137,10 @@ async function removeCategory(id: string, name: string) {
   try {
     await deleteCategory(id)
     if (selectedCategoryId.value === id) selectedCategoryId.value = ''
-    await fetchCategories()
-    await fetchProducts(ownerFocusBranchId.value ?? null)
+    const branchId = ownerFocusBranchId.value ?? null
+    await fetchCategories(branchId)
+    await fetchProducts(branchId)
+    await fetchCategoryUsage(branchId)
     toast.push('Category deleted', 'success')
   } catch (e: unknown) {
     toast.push(e instanceof Error ? e.message : 'Failed to delete category', 'error')
@@ -182,7 +205,7 @@ async function removeSubcategory(id: string, name: string) {
           >
             <option value="">Select category</option>
             <option v-for="c in branchCategories" :key="c.id" :value="c.id">
-              {{ c.name }} ({{ categoryUsageCount.get(c.id) ?? 0 }} products)
+              {{ c.name }} ({{ categoryUsageLabel(c.id) }})
             </option>
           </select>
         </div>
@@ -197,8 +220,14 @@ async function removeSubcategory(id: string, name: string) {
           </button>
           <button
             type="button"
-            class="rounded border border-red-400 bg-red-50 p-1.5 text-red-700 hover:bg-red-100"
-            title="Delete category"
+            class="rounded border border-red-400 p-1.5 text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+            :class="canDeleteCategory(selectedCategory.id) ? 'bg-red-50' : 'bg-brand-50'"
+            :disabled="!canDeleteCategory(selectedCategory.id)"
+            :title="
+              canDeleteCategory(selectedCategory.id)
+                ? 'Delete category'
+                : 'Remove or reassign active products before deleting'
+            "
             @click="removeCategory(selectedCategory.id, selectedCategory.name)"
           >
             <Icon icon="mdi:trash-can-outline" class="h-4 w-4" />

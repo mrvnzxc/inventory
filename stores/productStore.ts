@@ -6,9 +6,16 @@ function postgrestErrorMessage(err: {
   hint?: string | null
   code?: string
 }): string {
+  if (err.code === '23503') {
+    if (err.message?.includes('products_category_id_fkey')) {
+      return 'This category is still used by one or more products (including archived products). Reassign or remove those products first.'
+    }
+  }
   const parts = [err.message, err.details, err.hint].filter((p) => p != null && String(p).trim() !== '')
   return parts.length ? parts.join(' — ') : 'Database request failed'
 }
+
+export type CategoryUsage = { active: number; archived: number }
 
 function normalizeUuid(v: string | null | undefined): string | null {
   if (v == null || typeof v !== 'string') return null
@@ -31,6 +38,7 @@ export const useProductStore = defineStore('products', () => {
   const subcategories = ref<Subcategory[]>([])
   /** Subcategories for the category manager panel (follows “Add subcategory” category) */
   const managerSubcategories = ref<Subcategory[]>([])
+  const categoryUsage = ref<Record<string, CategoryUsage>>({})
   const loading = ref(false)
 
   async function fetchCategories(branchFilter?: string | null) {
@@ -162,32 +170,124 @@ export const useProductStore = defineStore('products', () => {
     return data
   }
 
+  async function fetchCategoryUsage(branchId: string | null) {
+    if (!branchId) {
+      categoryUsage.value = {}
+      return
+    }
+    const supabase = useSupabaseClient()
+    const { data, error } = await supabase
+      .from('products')
+      .select('category_id, deleted_at')
+      .eq('branch_id', branchId)
+    if (error) throw new Error(postgrestErrorMessage(error))
+    const map: Record<string, CategoryUsage> = {}
+    for (const row of data ?? []) {
+      if (!row.category_id) continue
+      const cur = map[row.category_id] ?? { active: 0, archived: 0 }
+      if (row.deleted_at) cur.archived += 1
+      else cur.active += 1
+      map[row.category_id] = cur
+    }
+    categoryUsage.value = map
+  }
+
   async function deleteCategory(categoryId: string) {
     const supabase = useSupabaseClient()
-    const [{ count: subCount, error: subErr }, { count: productCount, error: prodErr }] = await Promise.all([
-      supabase
-        .from('subcategories')
-        .select('id', { head: true, count: 'exact' })
-        .eq('category_id', categoryId),
-      supabase
+
+    const { error: rpcErr } = await supabase.rpc('delete_category_safe', {
+      p_category_id: categoryId,
+    })
+    if (!rpcErr) {
+      await fetchCategories()
+      await fetchSubcategories()
+      await fetchManagerSubcategories(null)
+      const authStore = useAuthStore()
+      const branchId = authStore.ownerFocusBranchId ?? authStore.branchId
+      if (branchId) await fetchCategoryUsage(branchId)
+      return
+    }
+
+    const rpcMsg = postgrestErrorMessage(rpcErr)
+    const rpcMissing =
+      rpcErr.code === 'PGRST202' ||
+      rpcMsg.includes('delete_category_safe') ||
+      rpcMsg.includes('Could not find the function')
+    if (!rpcMissing) {
+      throw new Error(rpcMsg)
+    }
+
+    const { data: cat, error: catErr } = await supabase
+      .from('categories')
+      .select('id, branch_id')
+      .eq('id', categoryId)
+      .single()
+    if (catErr) throw new Error(postgrestErrorMessage(catErr))
+
+    const { data: refs, error: refsErr } = await supabase
+      .from('products')
+      .select('id, deleted_at')
+      .eq('category_id', categoryId)
+    if (refsErr) throw new Error(postgrestErrorMessage(refsErr))
+
+    const linked = refs ?? []
+    const active = linked.filter((p) => p.deleted_at == null)
+    if (active.length > 0) {
+      throw new Error(
+        `Cannot delete: ${active.length} active product(s) use this category. Reassign or delete them on the Products page first.`,
+      )
+    }
+
+    if (linked.length > 0) {
+      let fallbackId: string | undefined
+      const { data: fallback, error: fallbackErr } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('branch_id', cat.branch_id)
+        .neq('id', categoryId)
+        .order('name')
+        .limit(1)
+      if (fallbackErr) throw new Error(postgrestErrorMessage(fallbackErr))
+      fallbackId = fallback?.[0]?.id
+
+      if (!fallbackId) {
+        const { data: created, error: createErr } = await supabase
+          .from('categories')
+          .insert({ branch_id: cat.branch_id, name: 'General' })
+          .select('id')
+          .single()
+        if (createErr) throw new Error(postgrestErrorMessage(createErr))
+        fallbackId = created?.id
+      }
+      if (!fallbackId) {
+        throw new Error('Could not find or create a category to move archived products into.')
+      }
+
+      const { error: moveErr } = await supabase
         .from('products')
-        .select('id', { head: true, count: 'exact' })
+        .update({ category_id: fallbackId, subcategory_id: null })
         .eq('category_id', categoryId)
-        .is('deleted_at', null),
-    ])
-    if (subErr) throw new Error(postgrestErrorMessage(subErr))
-    if (prodErr) throw new Error(postgrestErrorMessage(prodErr))
-    if ((productCount ?? 0) > 0) {
-      throw new Error('Cannot delete category while active products still use it.')
+      if (moveErr) throw new Error(postgrestErrorMessage(moveErr))
+
+      const { data: stillLinked, error: checkErr } = await supabase
+        .from('products')
+        .select('id')
+        .eq('category_id', categoryId)
+        .limit(1)
+      if (checkErr) throw new Error(postgrestErrorMessage(checkErr))
+      if ((stillLinked?.length ?? 0) > 0) {
+        throw new Error(
+          'Products still reference this category. Run database/migrations/013_delete_category_safe.sql in Supabase, then try again.',
+        )
+      }
     }
-    if ((subCount ?? 0) > 0) {
-      throw new Error('Delete its subcategories first before deleting this category.')
-    }
+
     const { error } = await supabase.from('categories').delete().eq('id', categoryId)
     if (error) throw new Error(postgrestErrorMessage(error))
     await fetchCategories()
     await fetchSubcategories()
     await fetchManagerSubcategories(null)
+    if (cat.branch_id) await fetchCategoryUsage(cat.branch_id)
   }
 
   async function updateSubcategory(subcategoryId: string, name: string) {
@@ -214,14 +314,33 @@ export const useProductStore = defineStore('products', () => {
       .eq('id', subcategoryId)
       .single()
     if (subErr) throw new Error(postgrestErrorMessage(subErr))
-    const { count: productCount, error: prodErr } = await supabase
-      .from('products')
-      .select('id', { head: true, count: 'exact' })
-      .eq('subcategory_id', subcategoryId)
-      .is('deleted_at', null)
-    if (prodErr) throw new Error(postgrestErrorMessage(prodErr))
-    if ((productCount ?? 0) > 0) {
-      throw new Error('Cannot delete subcategory while active products still use it.')
+    const [{ count: activeCount, error: activeErr }, { count: archivedCount, error: archivedErr }] =
+      await Promise.all([
+        supabase
+          .from('products')
+          .select('id', { head: true, count: 'exact' })
+          .eq('subcategory_id', subcategoryId)
+          .is('deleted_at', null),
+        supabase
+          .from('products')
+          .select('id', { head: true, count: 'exact' })
+          .eq('subcategory_id', subcategoryId)
+          .not('deleted_at', 'is', null),
+      ])
+    if (activeErr) throw new Error(postgrestErrorMessage(activeErr))
+    if (archivedErr) throw new Error(postgrestErrorMessage(archivedErr))
+    if ((activeCount ?? 0) > 0) {
+      throw new Error(
+        `Cannot delete: ${activeCount} active product(s) use this subcategory. Reassign them on the Products page first.`,
+      )
+    }
+    if ((archivedCount ?? 0) > 0) {
+      const { error: clearErr } = await supabase
+        .from('products')
+        .update({ subcategory_id: null })
+        .eq('subcategory_id', subcategoryId)
+        .not('deleted_at', 'is', null)
+      if (clearErr) throw new Error(postgrestErrorMessage(clearErr))
     }
     const { error } = await supabase.from('subcategories').delete().eq('id', subcategoryId)
     if (error) throw new Error(postgrestErrorMessage(error))
@@ -342,9 +461,11 @@ export const useProductStore = defineStore('products', () => {
     categories,
     subcategories,
     managerSubcategories,
+    categoryUsage,
     loading,
     fetchProducts,
     fetchCategories,
+    fetchCategoryUsage,
     fetchSubcategories,
     fetchManagerSubcategories,
     createCategory,
